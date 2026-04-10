@@ -1037,14 +1037,6 @@ function Compras({ T, parcelas }) {
     </div>
   );
 }
-  return (
-    <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10, padding: 60, textAlign: "center" }}>
-      <div style={{ fontSize: 28, color: T.borderLight, marginBottom: 14 }}>◌</div>
-      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, color: T.cream, marginBottom: 8 }}>{label}</div>
-      <div style={{ color: T.textMuted, fontSize: 14 }}>Esta sección está en desarrollo</div>
-    </div>
-  );
-}
 
 function Placeholder({ label, T }) {
   return (
