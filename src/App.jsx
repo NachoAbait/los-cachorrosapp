@@ -4,6 +4,10 @@ import {
   collection, doc, onSnapshot,
   setDoc, deleteDoc, updateDoc, addDoc
 } from "firebase/firestore";
+import {
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
+  Tooltip, ResponsiveContainer, Legend
+} from "recharts";
 
 const THEMES = {
   dark: {
@@ -648,6 +652,186 @@ function ParcelaPanel({ parcelaId, parcelaData, parcelas, T, onClose }) {
   );
 }
 
+// ─── STOCK ────────────────────────────────────────────────────────────────────
+function Stock({ T }) {
+  const [compras, setCompras] = useState([]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "compras"), snap => {
+      setCompras(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, []);
+
+  if (compras.length === 0) {
+    return (
+      <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10, padding: 60, textAlign: "center" }}>
+        <div style={{ fontSize: 28, color: T.borderLight, marginBottom: 14 }}>◈</div>
+        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, color: T.cream, marginBottom: 8, fontWeight: 700 }}>Sin datos de stock</div>
+        <div style={{ color: T.textMuted, fontSize: 14 }}>Registrá compras para ver las estadísticas acá</div>
+      </div>
+    );
+  }
+
+  // Calculos
+  const totalCabezas    = compras.reduce((s, c) => s + (c.cabezas || 0), 0);
+  const totalAsignadas  = compras.reduce((s, c) => s + ((c.cabezas || 0) - (c.stockRestante || 0)), 0);
+  const totalSinAsignar = compras.reduce((s, c) => s + (c.stockRestante || 0), 0);
+  const totalKg         = compras.reduce((s, c) => s + (c.kgTotal || 0), 0);
+  const totalInvertido  = compras.reduce((s, c) => s + (c.total || 0), 0);
+
+  // Por sexo
+  const machos   = compras.filter(c => c.sexo === "macho").reduce((s, c) => s + (c.cabezas || 0), 0);
+  const hembras  = compras.filter(c => c.sexo === "hembra").reduce((s, c) => s + (c.cabezas || 0), 0);
+  const mixtos   = compras.filter(c => c.sexo === "mixto").reduce((s, c) => s + (c.cabezas || 0), 0);
+  const dataSexo = [
+    machos  > 0 && { name: "Machos",  value: machos,  color: T.teal },
+    hembras > 0 && { name: "Hembras", value: hembras, color: T.brownLight },
+    mixtos  > 0 && { name: "Mixtos",  value: mixtos,  color: T.textMuted },
+  ].filter(Boolean);
+
+  // Por tipo de compra
+  const personal = compras.filter(c => c.tipoCompra === "personal" || !c.tipoCompra).reduce((s, c) => s + (c.cabezas || 0), 0);
+  const remate   = compras.filter(c => c.tipoCompra === "remate").reduce((s, c) => s + (c.cabezas || 0), 0);
+  const dataTipo = [
+    personal > 0 && { name: "Personal", value: personal, color: T.green },
+    remate   > 0 && { name: "Remate",   value: remate,   color: T.gold || "#c8a84a" },
+  ].filter(Boolean);
+
+  // Por productor
+  const porProductor = {};
+  compras.forEach(c => {
+    const p = c.productor || "Sin especificar";
+    porProductor[p] = (porProductor[p] || 0) + (c.cabezas || 0);
+  });
+  const dataProductor = Object.entries(porProductor).map(([name, value]) => ({ name, value }));
+
+  const fmt = (n) => n ? new Intl.NumberFormat("es-AR").format(Math.round(n)) : "0";
+
+  const tooltipStyle = {
+    background: T.bgCard, border: "1px solid " + T.border,
+    borderRadius: 8, fontSize: 13, color: T.text,
+  };
+
+  const CARD_STYLE = {
+    background: T.bgCard, border: "1px solid " + T.border,
+    borderRadius: 10, padding: "18px 22px",
+  };
+
+  return (
+    <div>
+      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 26, color: T.cream, fontWeight: 700, marginBottom: 4 }}>Stock</div>
+      <div style={{ fontSize: 14, color: T.textMuted, marginBottom: 24 }}>Resumen general de hacienda comprada</div>
+
+      {/* Cards principales */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 28 }}>
+        {[
+          { label: "Total comprado",   value: totalCabezas,    unit: "cab.",    color: T.cream },
+          { label: "En campo",         value: totalAsignadas,  unit: "cab.",    color: T.greenLight },
+          { label: "Sin asignar",      value: totalSinAsignar, unit: "cab.",    color: totalSinAsignar > 0 ? T.brownLight : T.textDim },
+          { label: "Peso total",       value: fmt(totalKg),    unit: "kg",      color: T.tealLight },
+          { label: "Total invertido",  value: "$ " + fmt(totalInvertido), unit: "", color: T.brownLight },
+        ].map(s => (
+          <div key={s.label} style={{ ...CARD_STYLE }}>
+            <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 6, letterSpacing: "0.04em" }}>{s.label}</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: s.color, lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>{s.value}</div>
+            {s.unit && <div style={{ fontSize: 12, color: T.textMuted, marginTop: 3 }}>{s.unit}</div>}
+          </div>
+        ))}
+      </div>
+
+      {/* Gráficos */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+
+        {/* Machos vs Hembras */}
+        <div style={{ ...CARD_STYLE }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: T.textMuted, letterSpacing: "0.06em", marginBottom: 16 }}>MACHOS VS HEMBRAS</div>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie data={dataSexo} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
+                {dataSexo.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+              </Pie>
+              <Tooltip contentStyle={tooltipStyle} formatter={(v, n) => [v + " cab.", n]} />
+              <Legend iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 13, color: T.textMuted }} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div style={{ display: "flex", justifyContent: "center", gap: 20, marginTop: 4 }}>
+            {dataSexo.map(d => (
+              <div key={d.name} style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 20, fontWeight: 800, color: d.color }}>{d.value}</div>
+                <div style={{ fontSize: 11, color: T.textMuted }}>{d.name}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Personal vs Remate */}
+        <div style={{ ...CARD_STYLE }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: T.textMuted, letterSpacing: "0.06em", marginBottom: 16 }}>PERSONAL VS REMATE</div>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie data={dataTipo} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
+                {dataTipo.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+              </Pie>
+              <Tooltip contentStyle={tooltipStyle} formatter={(v, n) => [v + " cab.", n]} />
+              <Legend iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 13, color: T.textMuted }} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div style={{ display: "flex", justifyContent: "center", gap: 20, marginTop: 4 }}>
+            {dataTipo.map(d => (
+              <div key={d.name} style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 20, fontWeight: 800, color: d.color }}>{d.value}</div>
+                <div style={{ fontSize: 11, color: T.textMuted }}>{d.name}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Por productor */}
+        <div style={{ ...CARD_STYLE }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: T.textMuted, letterSpacing: "0.06em", marginBottom: 16 }}>CABEZAS POR PRODUCTOR</div>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={dataProductor} layout="vertical" margin={{ left: 0, right: 20 }}>
+              <XAxis type="number" tick={{ fontSize: 11, fill: T.textMuted }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: T.textMuted }} axisLine={false} tickLine={false} width={90} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v) => [v + " cab.", "Cabezas"]} />
+              <Bar dataKey="value" fill={T.teal} radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Listado de tropas */}
+      <div style={{ ...CARD_STYLE, marginTop: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: T.textMuted, letterSpacing: "0.06em", marginBottom: 14 }}>TROPAS REGISTRADAS</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
+          {compras.map(c => (
+            <div key={c.id} style={{ background: T.bgHover, border: "1px solid " + T.border, borderRadius: 8, padding: "12px 16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <div style={{ fontWeight: 700, color: T.cream, fontSize: 15 }}>Tropa {c.tropa}</div>
+                <div style={{ fontSize: 11, padding: "2px 8px", borderRadius: 12,
+                  background: c.tipoCompra === "remate" ? "#c8a84a22" : T.green + "22",
+                  color: c.tipoCompra === "remate" ? "#c8a84a" : T.greenLight,
+                  border: "1px solid " + (c.tipoCompra === "remate" ? "#c8a84a" : T.green),
+                  fontWeight: 700 }}>
+                  {c.tipoCompra || "personal"}
+                </div>
+              </div>
+              <div style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.8 }}>
+                <div>{c.productor} · {c.fecha}</div>
+                <div>{c.cabezas} cab. · {c.pesoPromedio} kg/cab · {c.sexo}</div>
+                <div style={{ color: c.stockRestante > 0 ? T.brownLight : T.textDim }}>
+                  {c.stockRestante > 0 ? c.stockRestante + " sin asignar" : "Asignada completa"}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── COMPRAS ──────────────────────────────────────────────────────────────────
 function Compras({ T, parcelas }) {
   const [compras, setCompras]         = useState([]);
@@ -658,6 +842,7 @@ function Compras({ T, parcelas }) {
   const [asignarForm, setAsignarForm] = useState({ parcela: "", cantidad: 0 });
   const [form, setForm] = useState({
     tropa: "", fecha: new Date().toISOString().split("T")[0],
+    tipoCompra: "personal",
     productor: "", cabezas: "", sexo: "macho",
     pesoPromedio: "", precioKg: "", moneda: "ARS",
     flete: "", iva: "10.5", otrosGastos: "", observaciones: "",
@@ -711,7 +896,7 @@ function Compras({ T, parcelas }) {
         creadoEn:     new Date().toISOString().split("T")[0],
       });
       setShowForm(false);
-      setForm({ tropa: "", fecha: new Date().toISOString().split("T")[0], productor: "", cabezas: "", sexo: "macho", pesoPromedio: "", precioKg: "", moneda: "ARS", flete: "", iva: "10.5", otrosGastos: "", observaciones: "" });
+      setForm({ tropa: "", fecha: new Date().toISOString().split("T")[0], tipoCompra: "personal", productor: "", cabezas: "", sexo: "macho", pesoPromedio: "", precioKg: "", moneda: "ARS", flete: "", iva: "10.5", otrosGastos: "", observaciones: "" });
     } catch(e) { console.error(e); }
     setLoading(false);
   };
@@ -798,7 +983,7 @@ function Compras({ T, parcelas }) {
           </div>
 
           {/* Fila 2 */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
             <div>
               <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Cantidad de cabezas</div>
               <input type="number" placeholder="Ej: 120" value={form.cabezas} onChange={e => setForm(f => ({ ...f, cabezas: e.target.value }))} style={inp} />
@@ -809,6 +994,13 @@ function Compras({ T, parcelas }) {
                 <option value="macho">Macho</option>
                 <option value="hembra">Hembra</option>
                 <option value="mixto">Mixto</option>
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Tipo de compra</div>
+              <select value={form.tipoCompra} onChange={e => setForm(f => ({ ...f, tipoCompra: e.target.value }))} style={inp}>
+                <option value="personal">Personal</option>
+                <option value="remate">Remate</option>
               </select>
             </div>
             <div>
@@ -1165,8 +1357,9 @@ export default function App() {
 
           <main style={{ flex: 1, padding: 32, overflowY: "auto" }}>
             {tab === "campo"   && <MapaCampo parcelas={parcelas} infra={infra} T={T} />}
+            {tab === "stock"   && <Stock T={T} />}
             {tab === "compras" && <Compras T={T} parcelas={parcelas} />}
-            {tab !== "campo" && tab !== "compras" && <Placeholder label={NAV_ITEMS.find(n => n.id === tab)?.label} T={T} />}
+            {tab !== "campo" && tab !== "stock" && tab !== "compras" && <Placeholder label={NAV_ITEMS.find(n => n.id === tab)?.label} T={T} />}
           </main>
         </div>
       </div>
