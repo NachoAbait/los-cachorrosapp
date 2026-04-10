@@ -1,51 +1,57 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { db } from "./firebase";
+import {
+  collection, doc, onSnapshot,
+  setDoc, deleteDoc, updateDoc, addDoc
+} from "firebase/firestore";
 
+// ─── TEMAS ────────────────────────────────────────────────────────────────────
 const THEMES = {
   dark: {
-    bg:          "#13151a",
-    bgSidebar:   "#0e1014",
-    bgCard:      "#1a1d22",
-    bgHover:     "#22262e",
-    bgInput:     "#22262e",
-    border:      "#2e333d",
-    borderLight: "#3a4050",
-    green:       "#4e9e43",
-    greenLight:  "#72c464",
-    teal:        "#3a8c7e",
-    tealLight:   "#56b8a8",
-    brown:       "#8c6a3a",
-    brownLight:  "#b8924e",
-    red:         "#c84a4a",
-    text:        "#dde8e2",
-    textMuted:   "#6a8a7e",
-    textDim:     "#344e48",
-    cream:       "#f0e8d8",
-    shadow:      "rgba(0,0,0,0.45)",
-    activeNavBg: "#1f2e28",
+    bg:           "#13151a",
+    bgSidebar:    "#0e1014",
+    bgCard:       "#1a1d22",
+    bgHover:      "#22262e",
+    bgInput:      "#22262e",
+    border:       "#2e333d",
+    borderLight:  "#3a4050",
+    green:        "#4e9e43",
+    greenLight:   "#72c464",
+    teal:         "#3a8c7e",
+    tealLight:    "#56b8a8",
+    brown:        "#8c6a3a",
+    brownLight:   "#b8924e",
+    red:          "#c84a4a",
+    text:         "#d8dde8",
+    textMuted:    "#6a7a8e",
+    textDim:      "#38404e",
+    cream:        "#f0e8d8",
+    shadow:       "rgba(0,0,0,0.45)",
+    activeNavBg:  "#1e2d26",
     activeNavBorder: "#4e9e43",
     activeNavColor:  "#72c464",
   },
   light: {
-    bg:          "#f0f4f2",
-    bgSidebar:   "#e4ede8",
-    bgCard:      "#ffffff",
-    bgHover:     "#eaf2ee",
-    bgInput:     "#f0f4f2",
-    border:      "#c0d4cc",
-    borderLight: "#9abfb4",
-    green:       "#357a2c",
-    greenLight:  "#2a6222",
-    teal:        "#22766a",
-    tealLight:   "#185e54",
-    brown:       "#7a5228",
-    brownLight:  "#6a4420",
-    red:         "#a83030",
-    text:        "#162420",
-    textMuted:   "#4a6e62",
-    textDim:     "#8aada4",
-    cream:       "#2a1e10",
-    shadow:      "rgba(0,0,0,0.10)",
-    activeNavBg: "#ddeee8",
+    bg:           "#f0f4f2",
+    bgSidebar:    "#e4ede8",
+    bgCard:       "#ffffff",
+    bgHover:      "#eaf2ee",
+    bgInput:      "#f0f4f2",
+    border:       "#c0d4cc",
+    borderLight:  "#9abfb4",
+    green:        "#357a2c",
+    greenLight:   "#2a6222",
+    teal:         "#22766a",
+    tealLight:    "#185e54",
+    brown:        "#7a5228",
+    brownLight:   "#6a4420",
+    red:          "#a83030",
+    text:         "#162420",
+    textMuted:    "#4a6e62",
+    textDim:      "#8aada4",
+    cream:        "#2a1e10",
+    shadow:       "rgba(0,0,0,0.10)",
+    activeNavBg:  "#ddeee8",
     activeNavBorder: "#357a2c",
     activeNavColor:  "#1e5218",
   },
@@ -64,37 +70,28 @@ const NAV_ITEMS = [
   { id: "dashboard",     icon: "▤", label: "Dashboard" },
 ];
 
-const initialParcelas = {
-  "P1.1": { animales: 0,  estado: "descanso", diasEstado: 12, tropa: null,        tipo: null },
-  "P1.2": { animales: 45, estado: "pastoreo", diasEstado: 5,  tropa: "T-2024-01", tipo: "arrendamiento" },
-  "P2.1": { animales: 38, estado: "pastoreo", diasEstado: 3,  tropa: "T-2024-02", tipo: "arrendamiento" },
-  "P2.2": { animales: 0,  estado: "descanso", diasEstado: 8,  tropa: null,        tipo: null },
-  "P3.1": { animales: 0,  estado: "descanso", diasEstado: 15, tropa: null,        tipo: null },
-  "P3.2": { animales: 52, estado: "pastoreo", diasEstado: 7,  tropa: "T-2024-03", tipo: "arrendamiento" },
-  "P4.1": { animales: 41, estado: "pastoreo", diasEstado: 4,  tropa: "T-2024-04", tipo: "arrendamiento" },
-  "P4.2": { animales: 0,  estado: "descanso", diasEstado: 20, tropa: null,        tipo: null },
-  "P5":   { animales: 0,  estado: "descanso", diasEstado: 0,  tropa: null,        tipo: null },
-  "P6.1": { animales: 0,  estado: "descanso", diasEstado: 10, tropa: null,        tipo: null },
-  "P6.2": { animales: 63, estado: "pastoreo", diasEstado: 6,  tropa: "T-2024-05", tipo: "propio" },
-  "P7.1": { animales: 57, estado: "pastoreo", diasEstado: 9,  tropa: "T-2024-06", tipo: "propio" },
-  "P7.2": { animales: 0,  estado: "descanso", diasEstado: 14, tropa: null,        tipo: null },
-  "P8.1": { animales: 0,  estado: "descanso", diasEstado: 18, tropa: null,        tipo: null },
-  "P8.2": { animales: 49, estado: "pastoreo", diasEstado: 11, tropa: "T-2024-07", tipo: "propio" },
+const PARCELAS_DEFAULT = {
+  "P1.1": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P1.2": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P2.1": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P2.2": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P3.1": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P3.2": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P4.1": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P4.2": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P5":   { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P6.1": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P6.2": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P7.1": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P7.2": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P8.1": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P8.2": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
 };
-
-const initialInfra = [
-  { id: 1, tipo: "casa",   label: "Casa",      x: 51, y: 35, registros: [{ fecha: "2024-01-15", desc: "Refacción techo" }] },
-  { id: 2, tipo: "molino", label: "Molino 1",  x: 18, y: 25, registros: [{ fecha: "2024-03-10", desc: "Cambio de aspa" }] },
-  { id: 3, tipo: "molino", label: "Molino 2",  x: 72, y: 70, registros: [] },
-  { id: 4, tipo: "tanque", label: "Tanque 1",  x: 20, y: 65, registros: [{ fecha: "2024-02-20", desc: "Limpieza" }] },
-  { id: 5, tipo: "tanque", label: "Tanque 2",  x: 75, y: 45, registros: [] },
-  { id: 6, tipo: "bebida", label: "Bebida P3", x: 36, y: 72, registros: [] },
-  { id: 7, tipo: "manga",  label: "Manga",     x: 86, y: 22, registros: [{ fecha: "2024-04-01", desc: "Reparación cerrojo" }] },
-];
 
 const INFRA_ICONS = { casa: "⌂", molino: "⊛", tanque: "◉", bebida: "◎", manga: "⊞", otro: "◆" };
 
-function MapaCampo({ parcelas, setParcelas, infra, setInfra, T }) {
+// ─── MAPA ─────────────────────────────────────────────────────────────────────
+function MapaCampo({ parcelas, infra, setInfra, T }) {
   const [modoEdicion, setModoEdicion]         = useState(false);
   const [parcelaSelected, setParcelaSelected] = useState(null);
   const [hoveredParcela, setHoveredParcela]   = useState(null);
@@ -102,11 +99,12 @@ function MapaCampo({ parcelas, setParcelas, infra, setInfra, T }) {
   const [showInfraModal, setShowInfraModal]   = useState(null);
   const [newInfraForm, setNewInfraForm]       = useState({ tipo: "molino", label: "" });
   const [newRegistro, setNewRegistro]         = useState({ fecha: "", desc: "" });
+  const [loading, setLoading]                 = useState(false);
 
   const getColors = (data) => {
     if (!data || data.animales === 0) return { bg: T.bgHover, border: T.border, text: T.textDim };
-    if (data.tipo === "arrendamiento")  return { bg: T.teal + "38", border: T.teal, text: T.tealLight };
-    if (data.tipo === "propio")         return { bg: T.green + "38", border: T.green, text: T.greenLight };
+    if (data.tipo === "arrendamiento") return { bg: T.teal + "38", border: T.teal, text: T.tealLight };
+    if (data.tipo === "propio")        return { bg: T.green + "38", border: T.green, text: T.greenLight };
     return { bg: T.bgHover, border: T.borderLight, text: T.textMuted };
   };
 
@@ -118,19 +116,40 @@ function MapaCampo({ parcelas, setParcelas, infra, setInfra, T }) {
     setShowAddInfra({ x, y });
   };
 
-  const handleAddInfra = () => {
+  const handleAddInfra = async () => {
     if (!newInfraForm.label) return;
-    setInfra(prev => [...prev, { id: Date.now(), tipo: newInfraForm.tipo, label: newInfraForm.label, x: showAddInfra.x, y: showAddInfra.y, registros: [] }]);
-    setShowAddInfra(null);
-    setNewInfraForm({ tipo: "molino", label: "" });
+    setLoading(true);
+    try {
+      await addDoc(collection(db, "infraestructura"), {
+        tipo: newInfraForm.tipo,
+        label: newInfraForm.label,
+        x: showAddInfra.x,
+        y: showAddInfra.y,
+        registros: [],
+      });
+      setShowAddInfra(null);
+      setNewInfraForm({ tipo: "molino", label: "" });
+    } catch (e) { console.error(e); }
+    setLoading(false);
   };
 
-  const handleAddRegistro = (infraId) => {
+  const handleDeleteInfra = async (id) => {
+    setLoading(true);
+    try {
+      await deleteDoc(doc(db, "infraestructura", id));
+      setShowInfraModal(null);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  };
+
+  const handleAddRegistro = async (item) => {
     if (!newRegistro.fecha || !newRegistro.desc) return;
-    const reg = { ...newRegistro };
-    setInfra(prev => prev.map(i => i.id === infraId ? { ...i, registros: [...i.registros, reg] } : i));
-    setShowInfraModal(prev => ({ ...prev, registros: [...prev.registros, reg] }));
-    setNewRegistro({ fecha: "", desc: "" });
+    const updated = [...(item.registros || []), { ...newRegistro }];
+    try {
+      await updateDoc(doc(db, "infraestructura", item.id), { registros: updated });
+      setShowInfraModal(prev => ({ ...prev, registros: updated }));
+      setNewRegistro({ fecha: "", desc: "" });
+    } catch (e) { console.error(e); }
   };
 
   const parcelaData = parcelaSelected ? parcelas[parcelaSelected] : null;
@@ -147,12 +166,12 @@ function MapaCampo({ parcelas, setParcelas, infra, setInfra, T }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
         <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
           {[
-            { c: T.green, label: "Animales propios" },
-            { c: T.teal,  label: "Arrendamiento" },
-            { c: T.border,label: "Vacío / Descanso" },
+            { c: T.green,  label: "Animales propios" },
+            { c: T.teal,   label: "Arrendamiento" },
+            { c: T.border, label: "Vacío / Descanso" },
           ].map(l => (
             <div key={l.label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: T.textMuted }}>
-              <div style={{ width: 11, height: 11, borderRadius: 3, background: l.c + "28", border: "2px solid " + l.c }} />
+              <div style={{ width: 11, height: 11, borderRadius: 3, background: l.c + "38", border: "2px solid " + l.c }} />
               {l.label}
             </div>
           ))}
@@ -172,8 +191,15 @@ function MapaCampo({ parcelas, setParcelas, infra, setInfra, T }) {
         </div>
       </div>
 
+      {modoEdicion && (
+        <div style={{ padding: "8px 14px", background: T.teal + "18", border: "1px solid " + T.teal, borderRadius: 8, marginBottom: 14, fontSize: 13, color: T.tealLight }}>
+          Modo edición activo — hacé click en cualquier punto del mapa para agregar infraestructura. Click en un ícono existente para editarlo o eliminarlo.
+        </div>
+      )}
+
       {/* MAPA */}
-      <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10, overflow: "hidden", boxShadow: "0 2px 12px " + T.shadow, cursor: modoEdicion ? "crosshair" : "default", userSelect: "none", position: "relative" }}
+      <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10, overflow: "hidden",
+        boxShadow: "0 2px 12px " + T.shadow, cursor: modoEdicion ? "crosshair" : "default", userSelect: "none", position: "relative" }}
         onClick={handleMapClick}>
 
         {/* Zona header */}
@@ -188,7 +214,7 @@ function MapaCampo({ parcelas, setParcelas, infra, setInfra, T }) {
         </div>
 
         {/* Potreros */}
-        <div style={{ display: "flex", height: 200 }}>
+        <div style={{ display: "flex", height: 210 }}>
           {[1,2,3,4,5,6,7,8].map(p => {
             const esP5 = p === 5;
             const keys = esP5 ? ["P" + p] : ["P" + p + ".1", "P" + p + ".2"];
@@ -209,7 +235,7 @@ function MapaCampo({ parcelas, setParcelas, infra, setInfra, T }) {
                         borderRight: !esP5 && idx === 0 ? "1px dashed " + T.borderLight : "none",
                         background: sel ? col.border + "50" : hov ? col.border + "28" : col.bg,
                         outline: sel ? "2px solid " + col.border : "1px solid " + col.border,
-                        outlineOffset: -2,
+                        outlineOffset: -1,
                         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                         cursor: modoEdicion ? "crosshair" : "pointer",
                         transition: "background 0.12s", position: "relative", padding: 4,
@@ -253,10 +279,12 @@ function MapaCampo({ parcelas, setParcelas, infra, setInfra, T }) {
         {/* Infra overlay */}
         <div style={{ position: "absolute", top: 28, left: 0, right: 0, bottom: 0, pointerEvents: "none" }}>
           {infra.map(item => (
-            <div key={item.id} onClick={e => { e.stopPropagation(); setShowInfraModal(item); }} title={item.label}
+            <div key={item.id} onClick={e => { e.stopPropagation(); setShowInfraModal({ ...item }); }} title={item.label}
               style={{ position: "absolute", left: item.x + "%", top: item.y + "%", transform: "translate(-50%,-50%)",
-                fontSize: item.tipo === "casa" ? 20 : 15, cursor: "pointer", pointerEvents: "all", zIndex: 10,
-                color: T.brownLight, filter: modoEdicion ? "drop-shadow(0 0 5px " + T.brownLight + ")" : "none" }}>
+                fontSize: item.tipo === "casa" ? 20 : 16, cursor: "pointer", pointerEvents: "all", zIndex: 10,
+                color: modoEdicion ? T.brownLight : T.brownLight,
+                filter: modoEdicion ? "drop-shadow(0 0 6px " + T.brownLight + ")" : "drop-shadow(0 1px 3px " + T.shadow + ")",
+                transition: "all 0.2s" }}>
               {INFRA_ICONS[item.tipo] || "◆"}
             </div>
           ))}
@@ -265,22 +293,29 @@ function MapaCampo({ parcelas, setParcelas, infra, setInfra, T }) {
         {/* Popup agregar infra */}
         {showAddInfra && modoEdicion && (
           <div onClick={e => e.stopPropagation()} style={{
-            position: "absolute", left: Math.min(showAddInfra.x, 72) + "%", top: Math.min(showAddInfra.y + 5, 55) + "%",
+            position: "absolute", left: Math.min(showAddInfra.x, 70) + "%", top: Math.min(showAddInfra.y + 5, 55) + "%",
             background: T.bgCard, border: "1px solid " + T.brownLight, borderRadius: 10,
-            padding: 16, zIndex: 200, minWidth: 210, boxShadow: "0 6px 30px " + T.shadow }}>
+            padding: 16, zIndex: 200, minWidth: 220, boxShadow: "0 6px 30px " + T.shadow }}>
             <div style={{ fontWeight: 700, color: T.brownLight, marginBottom: 12, fontSize: 13 }}>Agregar infraestructura</div>
             <select value={newInfraForm.tipo} onChange={e => setNewInfraForm(f => ({ ...f, tipo: e.target.value }))} style={{ ...inp, marginBottom: 8 }}>
               <option value="molino">Molino</option>
               <option value="tanque">Tanque</option>
               <option value="bebida">Bebida</option>
               <option value="manga">Manga</option>
+              <option value="casa">Casa</option>
               <option value="otro">Otro</option>
             </select>
             <input placeholder="Nombre (ej: Molino Norte)" value={newInfraForm.label}
               onChange={e => setNewInfraForm(f => ({ ...f, label: e.target.value }))} style={{ ...inp, marginBottom: 12 }} />
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={handleAddInfra} style={{ flex: 1, padding: "7px 0", borderRadius: 6, border: "none", background: T.teal, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Agregar</button>
-              <button onClick={() => setShowAddInfra(null)} style={{ flex: 1, padding: "7px 0", borderRadius: 6, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>Cancelar</button>
+              <button onClick={handleAddInfra} disabled={loading}
+                style={{ flex: 1, padding: "7px 0", borderRadius: 6, border: "none", background: T.teal, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'Outfit', sans-serif", opacity: loading ? 0.7 : 1 }}>
+                {loading ? "Guardando..." : "Agregar"}
+              </button>
+              <button onClick={() => setShowAddInfra(null)}
+                style={{ flex: 1, padding: "7px 0", borderRadius: 6, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
+                Cancelar
+              </button>
             </div>
           </div>
         )}
@@ -288,20 +323,24 @@ function MapaCampo({ parcelas, setParcelas, infra, setInfra, T }) {
 
       {/* Modal infra */}
       {showInfraModal && (
-        <div onClick={() => setShowInfraModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+        <div onClick={() => setShowInfraModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 12, padding: 24, minWidth: 340, maxWidth: 460, width: "90%", boxShadow: "0 8px 40px " + T.shadow }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: T.cream, fontWeight: 700 }}>{showInfraModal.label}</div>
+              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: T.cream, fontWeight: 700 }}>
+                {INFRA_ICONS[showInfraModal.tipo]} {showInfraModal.label}
+              </div>
               {modoEdicion && (
-                <button onClick={() => { setInfra(p => p.filter(i => i.id !== showInfraModal.id)); setShowInfraModal(null); }}
+                <button onClick={() => handleDeleteInfra(showInfraModal.id)} disabled={loading}
                   style={{ padding: "5px 12px", borderRadius: 6, border: "none", background: T.red + "22", color: T.red, cursor: "pointer", fontSize: 12, fontFamily: "'Outfit', sans-serif" }}>
                   Eliminar
                 </button>
               )}
             </div>
-            <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 14 }}>Tipo: <span style={{ color: T.brownLight, fontWeight: 600 }}>{showInfraModal.tipo}</span></div>
+            <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 14 }}>
+              Tipo: <span style={{ color: T.brownLight, fontWeight: 600 }}>{showInfraModal.tipo}</span>
+            </div>
             <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: "0.07em", marginBottom: 8 }}>HISTORIAL DE ARREGLOS</div>
-            {showInfraModal.registros.length === 0
+            {(!showInfraModal.registros || showInfraModal.registros.length === 0)
               ? <div style={{ fontSize: 12, color: T.textDim, fontStyle: "italic", marginBottom: 12 }}>Sin registros aún</div>
               : showInfraModal.registros.map((r, i) => (
                 <div key={i} style={{ fontSize: 12, padding: "7px 10px", background: T.bgHover, borderRadius: 6, marginBottom: 4, borderLeft: "3px solid " + T.brownLight, color: T.text }}>
@@ -313,12 +352,13 @@ function MapaCampo({ parcelas, setParcelas, infra, setInfra, T }) {
               <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: "0.07em", marginBottom: 8 }}>AGREGAR REGISTRO</div>
               <input type="date" value={newRegistro.fecha} onChange={e => setNewRegistro(r => ({ ...r, fecha: e.target.value }))} style={{ ...inp, marginBottom: 8 }} />
               <input placeholder="Descripción..." value={newRegistro.desc} onChange={e => setNewRegistro(r => ({ ...r, desc: e.target.value }))} style={{ ...inp, marginBottom: 12 }} />
-              <button onClick={() => handleAddRegistro(showInfraModal.id)}
+              <button onClick={() => handleAddRegistro(showInfraModal)}
                 style={{ width: "100%", padding: "8px 0", borderRadius: 6, border: "none", background: T.teal, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
                 Agregar registro
               </button>
             </div>
-            <button onClick={() => setShowInfraModal(null)} style={{ width: "100%", marginTop: 10, padding: "8px 0", borderRadius: 6, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
+            <button onClick={() => setShowInfraModal(null)}
+              style={{ width: "100%", marginTop: 10, padding: "8px 0", borderRadius: 6, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
               Cerrar
             </button>
           </div>
@@ -353,18 +393,7 @@ function MapaCampo({ parcelas, setParcelas, infra, setInfra, T }) {
             ))}
           </div>
           <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: "0.07em", marginBottom: 8 }}>MOVIMIENTOS</div>
-          {[
-            { fecha: "2024-10-01", evento: "Ingreso tropa T-2024-06", animales: 57 },
-            { fecha: "2024-09-15", evento: "Salida hacia P7.2",        animales: 57 },
-            { fecha: "2024-08-20", evento: "Ingreso tropa T-2024-05",  animales: 60 },
-            { fecha: "2024-08-01", evento: "Inicio descanso",          animales: 0  },
-          ].map((h, i) => (
-            <div key={i} style={{ display: "flex", gap: 16, padding: "8px 12px", borderRadius: 6, background: i % 2 === 0 ? T.bgHover : "transparent", fontSize: 13 }}>
-              <span style={{ color: T.brownLight, minWidth: 90, fontWeight: 600 }}>{h.fecha}</span>
-              <span style={{ color: T.text, flex: 1 }}>{h.evento}</span>
-              {h.animales > 0 && <span style={{ color: T.teal, fontWeight: 600 }}>{h.animales} cab.</span>}
-            </div>
-          ))}
+          <div style={{ fontSize: 13, color: T.textDim, fontStyle: "italic" }}>Sin movimientos registrados aún</div>
         </div>
       )}
     </div>
@@ -381,13 +410,40 @@ function Placeholder({ label, T }) {
   );
 }
 
+// ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
   const [themeKey, setThemeKey]   = useState("dark");
   const [tab, setTab]             = useState("campo");
   const [sidebarOpen, setSidebar] = useState(true);
-  const [parcelas, setParcelas]   = useState(initialParcelas);
-  const [infra, setInfra]         = useState(initialInfra);
+  const [parcelas, setParcelas]   = useState(PARCELAS_DEFAULT);
+  const [infra, setInfra]         = useState([]);
+  const [loadingDB, setLoadingDB] = useState(true);
   const T = THEMES[themeKey];
+
+  // ── Escuchar infraestructura en tiempo real ──
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "infraestructura"), (snap) => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setInfra(items);
+      setLoadingDB(false);
+    });
+    return () => unsub();
+  }, []);
+
+  // ── Escuchar parcelas en tiempo real ──
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "parcelas"), (snap) => {
+      if (snap.docs.length > 0) {
+        const data = {};
+        snap.docs.forEach(d => { data[d.id] = d.data(); });
+        setParcelas(data);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const totalAnimales = Object.values(parcelas).reduce((s, p) => s + (p.animales || 0), 0);
+  const totalArrendados = Object.values(parcelas).filter(p => p.tipo === "arrendamiento").reduce((s, p) => s + (p.animales || 0), 0);
 
   return (
     <>
@@ -396,8 +452,6 @@ export default function App() {
 
         {/* SIDEBAR */}
         <aside style={{ width: sidebarOpen ? 220 : 58, flexShrink: 0, background: T.bgSidebar, borderRight: "1px solid " + T.border, display: "flex", flexDirection: "column", transition: "width 0.22s ease", overflow: "hidden" }}>
-
-          {/* Logo */}
           <div style={{ padding: "18px 14px", borderBottom: "1px solid " + T.border, display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ width: 30, height: 30, borderRadius: 8, background: T.brown, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 15 }}>C</div>
             {sidebarOpen && (
@@ -408,7 +462,6 @@ export default function App() {
             )}
           </div>
 
-          {/* Nav */}
           <nav style={{ flex: 1, padding: "10px 6px", display: "flex", flexDirection: "column", gap: 1 }}>
             {NAV_ITEMS.map(item => {
               const active = tab === item.id;
@@ -419,8 +472,7 @@ export default function App() {
                     borderRadius: 7, cursor: "pointer", transition: "all 0.12s",
                     background: active ? T.activeNavBg : "transparent",
                     color: active ? T.activeNavColor : T.textMuted,
-                    borderLeft: active ? "3px solid " + T.activeNavBorder : "3px solid transparent",
-                  }}>
+                    borderLeft: active ? "3px solid " + T.activeNavBorder : "3px solid transparent" }}>
                   <span style={{ fontSize: 13, flexShrink: 0 }}>{item.icon}</span>
                   {sidebarOpen && <span style={{ fontSize: 13, fontWeight: active ? 600 : 400, whiteSpace: "nowrap" }}>{item.label}</span>}
                 </div>
@@ -428,7 +480,6 @@ export default function App() {
             })}
           </nav>
 
-          {/* Bottom */}
           <div style={{ padding: "10px 6px", borderTop: "1px solid " + T.border, display: "flex", flexDirection: "column", gap: 2 }}>
             <div onClick={() => setThemeKey(k => k === "dark" ? "light" : "dark")} title={!sidebarOpen ? "Cambiar tema" : ""}
               style={{ display: "flex", alignItems: "center", gap: 10, padding: sidebarOpen ? "8px 10px" : "8px 0", justifyContent: sidebarOpen ? "flex-start" : "center", borderRadius: 7, cursor: "pointer", color: T.textMuted }}>
@@ -445,8 +496,6 @@ export default function App() {
 
         {/* CONTENT */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-
-          {/* Header */}
           <header style={{ padding: "14px 28px", borderBottom: "1px solid " + T.border, background: T.bgCard, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
               <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: T.cream, fontWeight: 700 }}>
@@ -456,20 +505,20 @@ export default function App() {
                 {new Date().toLocaleDateString("es-AR", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
               </div>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {loadingDB && <div style={{ fontSize: 12, color: T.textMuted }}>Conectando...</div>}
               <div style={{ padding: "5px 14px", borderRadius: 20, background: T.teal + "18", border: "1px solid " + T.teal, fontSize: 12, color: T.tealLight, fontWeight: 600 }}>
-                345 cab. totales
+                {totalAnimales} cab. totales
               </div>
               <div style={{ padding: "5px 14px", borderRadius: 20, background: T.brown + "18", border: "1px solid " + T.brown, fontSize: 12, color: T.brownLight, fontWeight: 600 }}>
-                176 arrendadas
+                {totalArrendados} arrendadas
               </div>
             </div>
           </header>
 
-          {/* Main */}
           <main style={{ flex: 1, padding: 24, overflowY: "auto" }}>
             {tab === "campo"
-              ? <MapaCampo parcelas={parcelas} setParcelas={setParcelas} infra={infra} setInfra={setInfra} T={T} />
+              ? <MapaCampo parcelas={parcelas} infra={infra} setInfra={setInfra} T={T} />
               : <Placeholder label={NAV_ITEMS.find(n => n.id === tab)?.label} T={T} />
             }
           </main>
