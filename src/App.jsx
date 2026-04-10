@@ -323,11 +323,10 @@ function MapaCampo({ parcelas, infra, T }) {
         {/* Popup agregar infra */}
         {showAddInfra && modoEdicion && (
           <div onClick={e => e.stopPropagation()} style={{
-            position: "absolute",
-            left: Math.min(showAddInfra.x, 70) + "%",
-            top: Math.min(showAddInfra.y + 5, 55) + "%",
+            position: "fixed",
+            left: "50%", top: "50%", transform: "translate(-50%, -50%)",
             background: T.bgCard, border: "1px solid " + T.brownLight, borderRadius: 10,
-            padding: 16, zIndex: 200, minWidth: 220, boxShadow: "0 6px 30px " + T.shadow,
+            padding: 20, zIndex: 1000, minWidth: 240, boxShadow: "0 6px 30px " + T.shadow,
           }}>
             <div style={{ fontWeight: 700, color: T.brownLight, marginBottom: 12, fontSize: 13 }}>Agregar infraestructura</div>
             <select value={newInfraForm.tipo} onChange={e => setNewInfraForm(f => ({ ...f, tipo: e.target.value }))} style={{ ...inp, marginBottom: 8 }}>
