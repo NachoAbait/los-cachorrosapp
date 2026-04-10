@@ -1,11 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { db } from "./firebase";
 import {
   collection, doc, onSnapshot,
   setDoc, deleteDoc, updateDoc, addDoc
 } from "firebase/firestore";
 
-// ─── TEMAS ────────────────────────────────────────────────────────────────────
 const THEMES = {
   dark: {
     bg:           "#13151a",
@@ -71,27 +70,26 @@ const NAV_ITEMS = [
 ];
 
 const PARCELAS_DEFAULT = {
-  "P1.1": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
-  "P1.2": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
-  "P2.1": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
-  "P2.2": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
-  "P3.1": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
-  "P3.2": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
-  "P4.1": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
-  "P4.2": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
-  "P5":   { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
-  "P6.1": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
-  "P6.2": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
-  "P7.1": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
-  "P7.2": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
-  "P8.1": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
-  "P8.2": { animales: 0,  estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P1.1": { animales: 0, estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P1.2": { animales: 0, estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P2.1": { animales: 0, estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P2.2": { animales: 0, estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P3.1": { animales: 0, estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P3.2": { animales: 0, estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P4.1": { animales: 0, estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P4.2": { animales: 0, estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P5":   { animales: 0, estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P6.1": { animales: 0, estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P6.2": { animales: 0, estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P7.1": { animales: 0, estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P7.2": { animales: 0, estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P8.1": { animales: 0, estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
+  "P8.2": { animales: 0, estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
 };
 
 const INFRA_ICONS = { casa: "⌂", molino: "⊛", tanque: "◉", bebida: "◎", manga: "⊞", otro: "◆" };
 
-// ─── MAPA ─────────────────────────────────────────────────────────────────────
-function MapaCampo({ parcelas, infra, setInfra, T }) {
+function MapaCampo({ parcelas, infra, T }) {
   const [modoEdicion, setModoEdicion]         = useState(false);
   const [parcelaSelected, setParcelaSelected] = useState(null);
   const [hoveredParcela, setHoveredParcela]   = useState(null);
@@ -100,6 +98,8 @@ function MapaCampo({ parcelas, infra, setInfra, T }) {
   const [newInfraForm, setNewInfraForm]       = useState({ tipo: "molino", label: "" });
   const [newRegistro, setNewRegistro]         = useState({ fecha: "", desc: "" });
   const [loading, setLoading]                 = useState(false);
+  const mapaRef                               = useRef(null);
+  const mouseDownRef                          = useRef({ x: 0, y: 0 });
 
   const getColors = (data) => {
     if (!data || data.animales === 0) return { bg: T.bgHover, border: T.border, text: T.textDim };
@@ -108,9 +108,17 @@ function MapaCampo({ parcelas, infra, setInfra, T }) {
     return { bg: T.bgHover, border: T.borderLight, text: T.textMuted };
   };
 
+  const handleMouseDown = (e) => {
+    mouseDownRef.current = { x: e.clientX, y: e.clientY };
+  };
+
   const handleMapClick = (e) => {
     if (!modoEdicion) return;
-    const rect = e.currentTarget.getBoundingClientRect();
+    // Si se movió más de 5px es drag, no click
+    const dx = Math.abs(e.clientX - mouseDownRef.current.x);
+    const dy = Math.abs(e.clientY - mouseDownRef.current.y);
+    if (dx > 5 || dy > 5) return;
+    const rect = mapaRef.current.getBoundingClientRect();
     const x = parseFloat((((e.clientX - rect.left) / rect.width) * 100).toFixed(1));
     const y = parseFloat((((e.clientY - rect.top) / rect.height) * 100).toFixed(1));
     setShowAddInfra({ x, y });
@@ -193,14 +201,21 @@ function MapaCampo({ parcelas, infra, setInfra, T }) {
 
       {modoEdicion && (
         <div style={{ padding: "8px 14px", background: T.teal + "18", border: "1px solid " + T.teal, borderRadius: 8, marginBottom: 14, fontSize: 13, color: T.tealLight }}>
-          Modo edición activo — hacé click en cualquier punto del mapa para agregar infraestructura. Click en un ícono existente para editarlo o eliminarlo.
+          Modo edición — hacé click en cualquier punto del mapa para agregar infraestructura. Click en un ícono existente para editarlo o eliminarlo.
         </div>
       )}
 
       {/* MAPA */}
-      <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10, overflow: "hidden",
-        boxShadow: "0 2px 12px " + T.shadow, cursor: modoEdicion ? "crosshair" : "default", userSelect: "none", position: "relative" }}
-        onClick={handleMapClick}>
+      <div
+        ref={mapaRef}
+        onMouseDown={handleMouseDown}
+        onClick={handleMapClick}
+        style={{
+          background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10,
+          overflow: "hidden", boxShadow: "0 2px 12px " + T.shadow,
+          cursor: modoEdicion ? "crosshair" : "default",
+          userSelect: "none", position: "relative",
+        }}>
 
         {/* Zona header */}
         <div style={{ display: "flex", borderBottom: "1px solid " + T.border }}>
@@ -279,12 +294,18 @@ function MapaCampo({ parcelas, infra, setInfra, T }) {
         {/* Infra overlay */}
         <div style={{ position: "absolute", top: 28, left: 0, right: 0, bottom: 0, pointerEvents: "none" }}>
           {infra.map(item => (
-            <div key={item.id} onClick={e => { e.stopPropagation(); setShowInfraModal({ ...item }); }} title={item.label}
-              style={{ position: "absolute", left: item.x + "%", top: item.y + "%", transform: "translate(-50%,-50%)",
-                fontSize: item.tipo === "casa" ? 20 : 16, cursor: "pointer", pointerEvents: "all", zIndex: 10,
-                color: modoEdicion ? T.brownLight : T.brownLight,
+            <div key={item.id}
+              onClick={e => { e.stopPropagation(); setShowInfraModal({ ...item }); }}
+              title={item.label}
+              style={{
+                position: "absolute", left: item.x + "%", top: item.y + "%",
+                transform: "translate(-50%,-50%)",
+                fontSize: item.tipo === "casa" ? 20 : 16,
+                cursor: "pointer", pointerEvents: "all", zIndex: 10,
+                color: T.brownLight,
                 filter: modoEdicion ? "drop-shadow(0 0 6px " + T.brownLight + ")" : "drop-shadow(0 1px 3px " + T.shadow + ")",
-                transition: "all 0.2s" }}>
+                transition: "all 0.2s",
+              }}>
               {INFRA_ICONS[item.tipo] || "◆"}
             </div>
           ))}
@@ -293,9 +314,12 @@ function MapaCampo({ parcelas, infra, setInfra, T }) {
         {/* Popup agregar infra */}
         {showAddInfra && modoEdicion && (
           <div onClick={e => e.stopPropagation()} style={{
-            position: "absolute", left: Math.min(showAddInfra.x, 70) + "%", top: Math.min(showAddInfra.y + 5, 55) + "%",
+            position: "absolute",
+            left: Math.min(showAddInfra.x, 70) + "%",
+            top: Math.min(showAddInfra.y + 5, 55) + "%",
             background: T.bgCard, border: "1px solid " + T.brownLight, borderRadius: 10,
-            padding: 16, zIndex: 200, minWidth: 220, boxShadow: "0 6px 30px " + T.shadow }}>
+            padding: 16, zIndex: 200, minWidth: 220, boxShadow: "0 6px 30px " + T.shadow,
+          }}>
             <div style={{ fontWeight: 700, color: T.brownLight, marginBottom: 12, fontSize: 13 }}>Agregar infraestructura</div>
             <select value={newInfraForm.tipo} onChange={e => setNewInfraForm(f => ({ ...f, tipo: e.target.value }))} style={{ ...inp, marginBottom: 8 }}>
               <option value="molino">Molino</option>
@@ -305,8 +329,12 @@ function MapaCampo({ parcelas, infra, setInfra, T }) {
               <option value="casa">Casa</option>
               <option value="otro">Otro</option>
             </select>
-            <input placeholder="Nombre (ej: Molino Norte)" value={newInfraForm.label}
-              onChange={e => setNewInfraForm(f => ({ ...f, label: e.target.value }))} style={{ ...inp, marginBottom: 12 }} />
+            <input
+              placeholder="Nombre (ej: Molino Norte)"
+              value={newInfraForm.label}
+              onChange={e => setNewInfraForm(f => ({ ...f, label: e.target.value }))}
+              style={{ ...inp, marginBottom: 12 }}
+            />
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={handleAddInfra} disabled={loading}
                 style={{ flex: 1, padding: "7px 0", borderRadius: 6, border: "none", background: T.teal, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'Outfit', sans-serif", opacity: loading ? 0.7 : 1 }}>
@@ -410,7 +438,6 @@ function Placeholder({ label, T }) {
   );
 }
 
-// ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
   const [themeKey, setThemeKey]   = useState("dark");
   const [tab, setTab]             = useState("campo");
@@ -420,17 +447,14 @@ export default function App() {
   const [loadingDB, setLoadingDB] = useState(true);
   const T = THEMES[themeKey];
 
-  // ── Escuchar infraestructura en tiempo real ──
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "infraestructura"), (snap) => {
-      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setInfra(items);
+      setInfra(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoadingDB(false);
     });
     return () => unsub();
   }, []);
 
-  // ── Escuchar parcelas en tiempo real ──
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "parcelas"), (snap) => {
       if (snap.docs.length > 0) {
@@ -442,7 +466,7 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  const totalAnimales = Object.values(parcelas).reduce((s, p) => s + (p.animales || 0), 0);
+  const totalAnimales   = Object.values(parcelas).reduce((s, p) => s + (p.animales || 0), 0);
   const totalArrendados = Object.values(parcelas).filter(p => p.tipo === "arrendamiento").reduce((s, p) => s + (p.animales || 0), 0);
 
   return (
@@ -450,7 +474,6 @@ export default function App() {
       <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet" />
       <div style={{ minHeight: "100vh", background: T.bg, color: T.text, fontFamily: "'Outfit', sans-serif", display: "flex", transition: "background 0.3s" }}>
 
-        {/* SIDEBAR */}
         <aside style={{ width: sidebarOpen ? 220 : 58, flexShrink: 0, background: T.bgSidebar, borderRight: "1px solid " + T.border, display: "flex", flexDirection: "column", transition: "width 0.22s ease", overflow: "hidden" }}>
           <div style={{ padding: "18px 14px", borderBottom: "1px solid " + T.border, display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ width: 30, height: 30, borderRadius: 8, background: T.brown, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 15 }}>C</div>
@@ -494,7 +517,6 @@ export default function App() {
           </div>
         </aside>
 
-        {/* CONTENT */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
           <header style={{ padding: "14px 28px", borderBottom: "1px solid " + T.border, background: T.bgCard, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
@@ -518,7 +540,7 @@ export default function App() {
 
           <main style={{ flex: 1, padding: 24, overflowY: "auto" }}>
             {tab === "campo"
-              ? <MapaCampo parcelas={parcelas} infra={infra} setInfra={setInfra} T={T} />
+              ? <MapaCampo parcelas={parcelas} infra={infra} T={T} />
               : <Placeholder label={NAV_ITEMS.find(n => n.id === tab)?.label} T={T} />
             }
           </main>
