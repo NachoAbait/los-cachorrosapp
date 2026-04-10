@@ -221,10 +221,10 @@ function MapaCampo({ parcelas, infra, T }) {
 
         {/* Zona header */}
         <div style={{ display: "flex", borderBottom: "1px solid " + T.border }}>
-          <div style={{ flex: 4, padding: "5px 12px", fontSize: 13, fontWeight: 700, letterSpacing: "0.07em", color: T.teal, borderRight: "1px solid " + T.border }}>
+          <div style={{ flex: 4, padding: "5px 12px", fontSize: 13, fontWeight: 700, letterSpacing: "0.07em", color: T.teal, borderRight: "3px solid " + T.brownLight }}>
             ARRENDAMIENTO — P1 a P4
           </div>
-          <div style={{ flex: 1, padding: "5px 0", fontSize: 11, textAlign: "center", color: T.textDim, borderRight: "1px solid " + T.border }}>P5</div>
+          <div style={{ flex: 1, padding: "5px 0", fontSize: 11, textAlign: "center", color: T.textDim, borderRight: "3px solid " + T.brownLight }}>P5</div>
           <div style={{ flex: 3, padding: "5px 12px", fontSize: 13, fontWeight: 700, letterSpacing: "0.07em", color: T.green, textAlign: "right" }}>
             PROPIO — P6 a P8
           </div>
@@ -236,7 +236,7 @@ function MapaCampo({ parcelas, infra, T }) {
             const esP5 = p === 5;
             const keys = esP5 ? ["P" + p] : ["P" + p + ".1", "P" + p + ".2"];
             return (
-              <div key={p} style={{ flex: 1, borderRight: p < 8 ? "2px solid " + T.border : "none", display: "flex" }}>
+              <div key={p} style={{ flex: 1, borderRight: p < 8 ? "3px solid " + T.brownLight : "none", display: "flex" }}>
                 {keys.map((key, idx) => {
                   const data = parcelas[key];
                   const col  = getColors(data);
