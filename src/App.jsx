@@ -98,6 +98,7 @@ function MapaCampo({ parcelas, infra, T }) {
   const [newInfraForm, setNewInfraForm]       = useState({ tipo: "molino", label: "" });
   const [newRegistro, setNewRegistro]         = useState({ fecha: "", desc: "" });
   const [loading, setLoading]                 = useState(false);
+  const [draggingId, setDraggingId]           = useState(null);
   const mapaRef                               = useRef(null);
   const mouseDownRef                          = useRef({ x: 0, y: 0 });
 
@@ -209,6 +210,7 @@ function MapaCampo({ parcelas, infra, T }) {
       <div
         ref={mapaRef}
         onMouseDown={handleMouseDown}
+        onDragOver={e => e.preventDefault()}
         // onClick removido
         style={{
           background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10,
@@ -304,16 +306,37 @@ function MapaCampo({ parcelas, infra, T }) {
         <div style={{ position: "absolute", top: 28, left: 0, right: 0, bottom: 0, pointerEvents: "none" }}>
           {infra.map(item => (
             <div key={item.id}
-              onClick={e => { e.stopPropagation(); setShowInfraModal({ ...item }); }}
               title={item.label}
+              onClick={e => { e.stopPropagation(); if (!draggingId) setShowInfraModal({ ...item }); }}
+              draggable={modoEdicion}
+              onDragStart={e => {
+                e.stopPropagation();
+                setDraggingId(item.id);
+                e.dataTransfer.effectAllowed = "move";
+              }}
+              onDragEnd={async e => {
+                e.stopPropagation();
+                if (!mapaRef.current) return;
+                const rect = mapaRef.current.getBoundingClientRect();
+                const x = parseFloat((((e.clientX - rect.left) / rect.width) * 100).toFixed(1));
+                const y = parseFloat((((e.clientY - rect.top) / rect.height) * 100).toFixed(1));
+                const clampedX = Math.min(Math.max(x, 1), 99);
+                const clampedY = Math.min(Math.max(y, 1), 99);
+                try {
+                  await updateDoc(doc(db, "infraestructura", item.id), { x: clampedX, y: clampedY });
+                } catch(err) { console.error(err); }
+                setDraggingId(null);
+              }}
               style={{
                 position: "absolute", left: item.x + "%", top: item.y + "%",
                 transform: "translate(-50%,-50%)",
                 fontSize: item.tipo === "casa" ? 20 : 16,
-                cursor: "pointer", pointerEvents: "all", zIndex: 20,
-                color: T.brownLight,
+                cursor: modoEdicion ? "grab" : "pointer",
+                pointerEvents: "all", zIndex: 20,
+                color: draggingId === item.id ? T.tealLight : T.brownLight,
                 filter: modoEdicion ? "drop-shadow(0 0 6px " + T.brownLight + ")" : "drop-shadow(0 1px 3px " + T.shadow + ")",
-                transition: "all 0.2s",
+                opacity: draggingId === item.id ? 0.4 : 1,
+                transition: draggingId === item.id ? "none" : "all 0.2s",
               }}>
               {INFRA_ICONS[item.tipo] || "◆"}
             </div>
