@@ -105,8 +105,8 @@ function MapaCampo({ parcelas, setParcelas, infra, setInfra, T }) {
 
   const getColors = (data) => {
     if (!data || data.animales === 0) return { bg: T.bgHover, border: T.border, text: T.textDim };
-    if (data.tipo === "arrendamiento")  return { bg: T.teal + "18", border: T.teal, text: T.tealLight };
-    if (data.tipo === "propio")         return { bg: T.green + "18", border: T.green, text: T.greenLight };
+    if (data.tipo === "arrendamiento")  return { bg: T.teal + "38", border: T.teal, text: T.tealLight };
+    if (data.tipo === "propio")         return { bg: T.green + "38", border: T.green, text: T.greenLight };
     return { bg: T.bgHover, border: T.borderLight, text: T.textMuted };
   };
 
@@ -207,8 +207,8 @@ function MapaCampo({ parcelas, setParcelas, infra, setInfra, T }) {
                       style={{
                         flex: 1,
                         borderRight: !esP5 && idx === 0 ? "1px dashed " + T.borderLight : "none",
-                        background: sel ? col.border + "28" : hov ? col.border + "14" : col.bg,
-                        outline: sel ? "2px solid " + col.border : "none",
+                        background: sel ? col.border + "50" : hov ? col.border + "28" : col.bg,
+                        outline: sel ? "2px solid " + col.border : "1px solid " + col.border,
                         outlineOffset: -2,
                         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                         cursor: modoEdicion ? "crosshair" : "pointer",
