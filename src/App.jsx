@@ -164,7 +164,7 @@ function MapaCampo({ parcelas, infra, T }) {
   const parcelaData = parcelaSelected ? parcelas[parcelaSelected] : null;
 
   const inp = {
-    width: "100%", padding: "8px 10px", borderRadius: 6, fontSize: 13,
+    width: "100%", padding: "10px 12px", borderRadius: 6, fontSize: 14,
     background: T.bgInput, border: "1px solid " + T.border,
     color: T.text, boxSizing: "border-box", outline: "none", fontFamily: "'Outfit', sans-serif",
   };
@@ -221,17 +221,17 @@ function MapaCampo({ parcelas, infra, T }) {
 
         {/* Zona header */}
         <div style={{ display: "flex", borderBottom: "1px solid " + T.border }}>
-          <div style={{ flex: 4, padding: "5px 12px", fontSize: 11, fontWeight: 700, letterSpacing: "0.07em", color: T.teal, borderRight: "1px solid " + T.border }}>
+          <div style={{ flex: 4, padding: "5px 12px", fontSize: 13, fontWeight: 700, letterSpacing: "0.07em", color: T.teal, borderRight: "1px solid " + T.border }}>
             ARRENDAMIENTO — P1 a P4
           </div>
           <div style={{ flex: 1, padding: "5px 0", fontSize: 11, textAlign: "center", color: T.textDim, borderRight: "1px solid " + T.border }}>P5</div>
-          <div style={{ flex: 3, padding: "5px 12px", fontSize: 11, fontWeight: 700, letterSpacing: "0.07em", color: T.green, textAlign: "right" }}>
+          <div style={{ flex: 3, padding: "5px 12px", fontSize: 13, fontWeight: 700, letterSpacing: "0.07em", color: T.green, textAlign: "right" }}>
             PROPIO — P6 a P8
           </div>
         </div>
 
         {/* Potreros */}
-        <div style={{ display: "flex", height: 210 }}>
+        <div style={{ display: "flex", height: 260 }}>
           {[1,2,3,4,5,6,7,8].map(p => {
             const esP5 = p === 5;
             const keys = esP5 ? ["P" + p] : ["P" + p + ".1", "P" + p + ".2"];
@@ -257,12 +257,12 @@ function MapaCampo({ parcelas, infra, T }) {
                         cursor: modoEdicion ? "crosshair" : "pointer",
                         transition: "background 0.12s", position: "relative", padding: 4,
                       }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: col.text, letterSpacing: "0.04em", marginBottom: 3 }}>{key}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: col.text, letterSpacing: "0.04em", marginBottom: 4 }}>{key}</div>
                       {!modoEdicion && data && data.animales > 0 ? (
                         <>
-                          <div style={{ fontSize: 21, fontWeight: 800, color: col.text, lineHeight: 1 }}>{data.animales}</div>
-                          <div style={{ fontSize: 9, color: T.textMuted, marginTop: 1 }}>cabezas</div>
-                          <div style={{ fontSize: 9, color: T.brownLight, marginTop: 3, fontWeight: 600 }}>{data.diasEstado}d pastoreo</div>
+                          <div style={{ fontSize: 26, fontWeight: 800, color: col.text, lineHeight: 1 }}>{data.animales}</div>
+                          <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2 }}>cabezas</div>
+                          <div style={{ fontSize: 11, color: T.brownLight, marginTop: 3, fontWeight: 600 }}>{data.diasEstado}d pastoreo</div>
                         </>
                       ) : !modoEdicion ? (
                         <div style={{ fontSize: 10, color: T.textDim, fontStyle: "italic" }}>
@@ -512,7 +512,7 @@ function ParcelaPanel({ parcelaId, parcelaData, parcelas, T, onClose }) {
   };
 
   const inp = {
-    width: "100%", padding: "8px 10px", borderRadius: 6, fontSize: 13,
+    width: "100%", padding: "10px 12px", borderRadius: 6, fontSize: 14,
     background: T.bgInput, border: "1px solid " + T.border,
     color: T.text, boxSizing: "border-box", outline: "none", fontFamily: "'Outfit', sans-serif",
   };
@@ -740,7 +740,7 @@ function Compras({ T, parcelas }) {
   const fmt = (n) => n ? new Intl.NumberFormat("es-AR").format(Math.round(n)) : "—";
 
   const inp = {
-    width: "100%", padding: "8px 10px", borderRadius: 6, fontSize: 13,
+    width: "100%", padding: "10px 12px", borderRadius: 6, fontSize: 14,
     background: T.bgInput, border: "1px solid " + T.border,
     color: T.text, boxSizing: "border-box", outline: "none", fontFamily: "'Outfit', sans-serif",
   };
@@ -754,7 +754,7 @@ function Compras({ T, parcelas }) {
           <div style={{ fontSize: 13, color: T.textMuted, marginTop: 2 }}>Registro de tropas ingresadas al campo</div>
         </div>
         <button onClick={() => setShowForm(v => !v)}
-          style={{ padding: "8px 20px", borderRadius: 7, border: "none", background: T.green, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
+          style={{ padding: "10px 24px", borderRadius: 7, border: "none", background: T.green, color: "#fff", cursor: "pointer", fontSize: 15, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
           {showForm ? "Cancelar" : "+ Nueva compra"}
         </button>
       </div>
@@ -933,7 +933,7 @@ function Compras({ T, parcelas }) {
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Parcela destino</div>
               <select value={asignarForm.parcela} onChange={e => setAsignarForm(f => ({ ...f, parcela: e.target.value }))}
-                style={{ width: "100%", padding: "8px 10px", borderRadius: 6, fontSize: 13, background: T.bgInput, border: "1px solid " + T.border, color: T.text, fontFamily: "'Outfit', sans-serif" }}>
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 6, fontSize: 14, background: T.bgInput, border: "1px solid " + T.border, color: T.text, fontFamily: "'Outfit', sans-serif" }}>
                 <option value="">— Seleccionar parcela —</option>
                 {Object.keys(parcelas).map(k => (
                   <option key={k} value={k}>{k} {parcelas[k]?.animales > 0 ? "(" + parcelas[k].animales + " cab. actuales)" : "(vacía)"}</option>
@@ -944,7 +944,7 @@ function Compras({ T, parcelas }) {
               <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Cantidad a asignar</div>
               <input type="number" min={1} max={showAsignar.stockRestante} value={asignarForm.cantidad}
                 onChange={e => setAsignarForm(f => ({ ...f, cantidad: e.target.value }))}
-                style={{ width: "100%", padding: "8px 10px", borderRadius: 6, fontSize: 13, background: T.bgInput, border: "1px solid " + T.border, color: T.text, boxSizing: "border-box", fontFamily: "'Outfit', sans-serif" }} />
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 6, fontSize: 14, background: T.bgInput, border: "1px solid " + T.border, color: T.text, boxSizing: "border-box", fontFamily: "'Outfit', sans-serif" }} />
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={handleAsignar} disabled={loading || !asignarForm.parcela || !asignarForm.cantidad}
@@ -1084,13 +1084,13 @@ export default function App() {
       <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet" />
       <div style={{ minHeight: "100vh", background: T.bg, color: T.text, fontFamily: "'Outfit', sans-serif", display: "flex", transition: "background 0.3s" }}>
 
-        <aside style={{ width: sidebarOpen ? 220 : 58, flexShrink: 0, background: T.bgSidebar, borderRight: "1px solid " + T.border, display: "flex", flexDirection: "column", transition: "width 0.22s ease", overflow: "hidden" }}>
+        <aside style={{ width: sidebarOpen ? 260 : 68, flexShrink: 0, background: T.bgSidebar, borderRight: "1px solid " + T.border, display: "flex", flexDirection: "column", transition: "width 0.22s ease", overflow: "hidden" }}>
           <div style={{ padding: "18px 14px", borderBottom: "1px solid " + T.border, display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: T.brown, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 15 }}>C</div>
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: T.brown, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 18 }}>C</div>
             {sidebarOpen && (
               <div>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, color: T.cream, fontWeight: 700, lineHeight: 1.15 }}>Los Cachorros</div>
-                <div style={{ fontSize: 11, color: T.textMuted }}>Campo ganadero</div>
+                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, color: T.cream, fontWeight: 700, lineHeight: 1.15 }}>Los Cachorros</div>
+                <div style={{ fontSize: 13, color: T.textMuted }}>Campo ganadero</div>
               </div>
             )}
           </div>
@@ -1101,13 +1101,13 @@ export default function App() {
               return (
                 <div key={item.id} onClick={() => setTab(item.id)} title={!sidebarOpen ? item.label : ""}
                   style={{ display: "flex", alignItems: "center", gap: 10,
-                    padding: sidebarOpen ? "9px 10px" : "9px 0", justifyContent: sidebarOpen ? "flex-start" : "center",
+                    padding: sidebarOpen ? "11px 14px" : "11px 0", justifyContent: sidebarOpen ? "flex-start" : "center",
                     borderRadius: 7, cursor: "pointer", transition: "all 0.12s",
                     background: active ? T.activeNavBg : "transparent",
                     color: active ? T.activeNavColor : T.textMuted,
                     borderLeft: active ? "3px solid " + T.activeNavBorder : "3px solid transparent" }}>
                   <span style={{ fontSize: 13, flexShrink: 0 }}>{item.icon}</span>
-                  {sidebarOpen && <span style={{ fontSize: 13, fontWeight: active ? 600 : 400, whiteSpace: "nowrap" }}>{item.label}</span>}
+                  {sidebarOpen && <span style={{ fontSize: 15, fontWeight: active ? 600 : 400, whiteSpace: "nowrap" }}>{item.label}</span>}
                 </div>
               );
             })}
@@ -1128,27 +1128,27 @@ export default function App() {
         </aside>
 
         <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-          <header style={{ padding: "14px 28px", borderBottom: "1px solid " + T.border, background: T.bgCard, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <header style={{ padding: "18px 32px", borderBottom: "1px solid " + T.border, background: T.bgCard, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, color: T.cream, fontWeight: 700 }}>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 26, color: T.cream, fontWeight: 700 }}>
                 {NAV_ITEMS.find(n => n.id === tab)?.label}
               </div>
-              <div style={{ fontSize: 12, color: T.textMuted, marginTop: 1 }}>
+              <div style={{ fontSize: 14, color: T.textMuted, marginTop: 2 }}>
                 {new Date().toLocaleDateString("es-AR", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
               </div>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               {loadingDB && <div style={{ fontSize: 12, color: T.textMuted }}>Conectando...</div>}
-              <div style={{ padding: "5px 14px", borderRadius: 20, background: T.teal + "18", border: "1px solid " + T.teal, fontSize: 12, color: T.tealLight, fontWeight: 600 }}>
+              <div style={{ padding: "7px 18px", borderRadius: 20, background: T.teal + "18", border: "1px solid " + T.teal, fontSize: 14, color: T.tealLight, fontWeight: 600 }}>
                 {totalAnimales} cab. totales
               </div>
-              <div style={{ padding: "5px 14px", borderRadius: 20, background: T.brown + "18", border: "1px solid " + T.brown, fontSize: 12, color: T.brownLight, fontWeight: 600 }}>
+              <div style={{ padding: "7px 18px", borderRadius: 20, background: T.brown + "18", border: "1px solid " + T.brown, fontSize: 14, color: T.brownLight, fontWeight: 600 }}>
                 {totalArrendados} arrendadas
               </div>
             </div>
           </header>
 
-          <main style={{ flex: 1, padding: 24, overflowY: "auto" }}>
+          <main style={{ flex: 1, padding: 32, overflowY: "auto" }}>
             {tab === "campo"   && <MapaCampo parcelas={parcelas} infra={infra} T={T} />}
             {tab === "compras" && <Compras T={T} parcelas={parcelas} />}
             {tab !== "campo" && tab !== "compras" && <Placeholder label={NAV_ITEMS.find(n => n.id === tab)?.label} T={T} />}
