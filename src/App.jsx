@@ -209,7 +209,7 @@ function MapaCampo({ parcelas, infra, T }) {
       <div
         ref={mapaRef}
         onMouseDown={handleMouseDown}
-        onClick={handleMapClick}
+        // onClick removido
         style={{
           background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10,
           overflow: "hidden", boxShadow: "0 2px 12px " + T.shadow,
@@ -291,6 +291,15 @@ function MapaCampo({ parcelas, infra, T }) {
           })}
         </div>
 
+        {/* Capa de clicks en modo edicion */}
+        {modoEdicion && (
+          <div
+            onMouseDown={handleMouseDown}
+            onClick={handleMapClick}
+            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 5, cursor: "crosshair" }}
+          />
+        )}
+
         {/* Infra overlay */}
         <div style={{ position: "absolute", top: 28, left: 0, right: 0, bottom: 0, pointerEvents: "none" }}>
           {infra.map(item => (
@@ -301,7 +310,7 @@ function MapaCampo({ parcelas, infra, T }) {
                 position: "absolute", left: item.x + "%", top: item.y + "%",
                 transform: "translate(-50%,-50%)",
                 fontSize: item.tipo === "casa" ? 20 : 16,
-                cursor: "pointer", pointerEvents: "all", zIndex: 10,
+                cursor: "pointer", pointerEvents: "all", zIndex: 20,
                 color: T.brownLight,
                 filter: modoEdicion ? "drop-shadow(0 0 6px " + T.brownLight + ")" : "drop-shadow(0 1px 3px " + T.shadow + ")",
                 transition: "all 0.2s",
