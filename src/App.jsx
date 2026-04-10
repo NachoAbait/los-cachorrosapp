@@ -2,13 +2,13 @@ import { useState } from "react";
 
 const THEMES = {
   dark: {
-    bg:          "#111614",
-    bgSidebar:   "#0d1210",
-    bgCard:      "#181f1c",
-    bgHover:     "#1f2923",
-    bgInput:     "#1f2923",
-    border:      "#283530",
-    borderLight: "#354840",
+    bg:          "#13151a",
+    bgSidebar:   "#0e1014",
+    bgCard:      "#1a1d22",
+    bgHover:     "#22262e",
+    bgInput:     "#22262e",
+    border:      "#2e333d",
+    borderLight: "#3a4050",
     green:       "#4e9e43",
     greenLight:  "#72c464",
     teal:        "#3a8c7e",
@@ -228,7 +228,7 @@ function MapaCampo({ parcelas, setParcelas, infra, setInfra, T }) {
                       ) : null}
 
                       {hov && !modoEdicion && data && (
-                        <div style={{ position: "absolute", bottom: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)",
+                        <div style={{ position: "absolute", top: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)",
                           background: T.bgCard, border: "1px solid " + col.border, borderRadius: 8,
                           padding: "10px 14px", minWidth: 165, zIndex: 100, pointerEvents: "none",
                           boxShadow: "0 4px 20px " + T.shadow }}>
