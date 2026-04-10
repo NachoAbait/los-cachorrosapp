@@ -844,6 +844,7 @@ function Compras({ T, parcelas }) {
     tropa: "", fecha: new Date().toISOString().split("T")[0],
     tipoCompra: "personal",
     productor: "", cabezas: "", sexo: "macho",
+    machosCount: "", hembrasCount: "",
     pesoPromedio: "", precioKg: "", moneda: "ARS",
     flete: "", iva: "10.5", otrosGastos: "", observaciones: "",
   });
@@ -896,7 +897,7 @@ function Compras({ T, parcelas }) {
         creadoEn:     new Date().toISOString().split("T")[0],
       });
       setShowForm(false);
-      setForm({ tropa: "", fecha: new Date().toISOString().split("T")[0], tipoCompra: "personal", productor: "", cabezas: "", sexo: "macho", pesoPromedio: "", precioKg: "", moneda: "ARS", flete: "", iva: "10.5", otrosGastos: "", observaciones: "" });
+      setForm({ tropa: "", fecha: new Date().toISOString().split("T")[0], tipoCompra: "personal", productor: "", cabezas: "", sexo: "macho", machosCount: "", hembrasCount: "", pesoPromedio: "", precioKg: "", moneda: "ARS", flete: "", iva: "10.5", otrosGastos: "", observaciones: "" });
     } catch(e) { console.error(e); }
     setLoading(false);
   };
@@ -1008,6 +1009,38 @@ function Compras({ T, parcelas }) {
               <input type="number" placeholder="Ej: 200" value={form.pesoPromedio} onChange={e => setForm(f => ({ ...f, pesoPromedio: e.target.value }))} style={inp} />
             </div>
           </div>
+
+          {/* Campos mixto */}
+          {form.sexo === "mixto" && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12, padding: "14px", background: T.bgHover, borderRadius: 8, border: "1px solid " + T.borderLight }}>
+              <div>
+                <div style={{ fontSize: 11, color: T.tealLight, marginBottom: 4, fontWeight: 700 }}>Cantidad de machos</div>
+                <input type="number" placeholder="Ej: 60" value={form.machosCount}
+                  onChange={e => {
+                    const m = parseInt(e.target.value) || 0;
+                    const h = parseInt(form.hembrasCount) || 0;
+                    setForm(f => ({ ...f, machosCount: e.target.value, cabezas: String(m + h) }));
+                  }} style={inp} />
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: T.brownLight, marginBottom: 4, fontWeight: 700 }}>Cantidad de hembras</div>
+                <input type="number" placeholder="Ej: 60" value={form.hembrasCount}
+                  onChange={e => {
+                    const h = parseInt(e.target.value) || 0;
+                    const m = parseInt(form.machosCount) || 0;
+                    setForm(f => ({ ...f, hembrasCount: e.target.value, cabezas: String(m + h) }));
+                  }} style={inp} />
+              </div>
+              {form.cabezas && (
+                <div style={{ gridColumn: "1/-1", fontSize: 12, color: T.textMuted }}>
+                  Total: <b style={{ color: T.cream }}>{form.cabezas} cabezas</b>
+                  {form.machosCount && form.hembrasCount && (
+                    <span> ({Math.round(parseInt(form.machosCount)/parseInt(form.cabezas)*100)}% machos / {Math.round(parseInt(form.hembrasCount)/parseInt(form.cabezas)*100)}% hembras)</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Fila 3 - Costos */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
@@ -1142,9 +1175,15 @@ function Compras({ T, parcelas }) {
               <select value={asignarForm.parcela} onChange={e => setAsignarForm(f => ({ ...f, parcela: e.target.value }))}
                 style={{ width: "100%", padding: "10px 12px", borderRadius: 6, fontSize: 14, background: T.bgInput, border: "1px solid " + T.border, color: T.text, fontFamily: "'Outfit', sans-serif" }}>
                 <option value="">— Seleccionar parcela —</option>
-                {Object.keys(parcelas).map(k => (
-                  <option key={k} value={k}>{k} {parcelas[k]?.animales > 0 ? "(" + parcelas[k].animales + " cab. actuales)" : "(vacía)"}</option>
-                ))}
+                {Object.keys({ ...PARCELAS_DEFAULT, ...parcelas }).sort().map(k => {
+                  const data = parcelas[k];
+                  const tieneAnimales = data?.animales > 0;
+                  return (
+                    <option key={k} value={k}>
+                      {k} {tieneAnimales ? "⚠ pastoreando (" + data.animales + " cab.)" : "(vacía)"}
+                    </option>
+                  );
+                })}
               </select>
             </div>
             <div style={{ marginBottom: 18 }}>
