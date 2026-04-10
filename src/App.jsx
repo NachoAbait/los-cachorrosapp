@@ -536,7 +536,7 @@ function ParcelaPanel({ parcelaId, parcelaData, parcelas, T, onClose }) {
     color: T.text, boxSizing: "border-box", outline: "none", fontFamily: "'Outfit', sans-serif",
   };
 
-  const todasLasParcelas = Object.keys(parcelas).filter(k => k !== parcelaId);
+  const todasLasParcelas = Object.keys({ ...PARCELAS_DEFAULT, ...parcelas }).filter(k => k !== parcelaId).sort();
 
   return (
     <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10, padding: 20, marginTop: 20 }}>
@@ -598,9 +598,14 @@ function ParcelaPanel({ parcelaId, parcelaData, parcelas, T, onClose }) {
               <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Parcela destino</div>
               <select value={rotForm.destino} onChange={e => setRotForm(f => ({ ...f, destino: e.target.value }))} style={inp}>
                 <option value="">— Seleccionar —</option>
-                {todasLasParcelas.map(k => (
-                  <option key={k} value={k}>{k} {parcelas[k]?.animales > 0 ? "(" + parcelas[k].animales + " cab.)" : "(vacía)"}</option>
-                ))}
+                {todasLasParcelas.map(k => {
+                  const d = parcelas[k];
+                  return (
+                    <option key={k} value={k}>
+                      {k} {d?.animales > 0 ? "⚠ pastoreando (" + d.animales + " cab.)" : "(vacía)"}
+                    </option>
+                  );
+                })}
               </select>
             </div>
             <div>
@@ -681,13 +686,19 @@ function Stock({ T }) {
   const totalInvertido  = compras.reduce((s, c) => s + (c.total || 0), 0);
 
   // Por sexo
-  const machos   = compras.filter(c => c.sexo === "macho").reduce((s, c) => s + (c.cabezas || 0), 0);
-  const hembras  = compras.filter(c => c.sexo === "hembra").reduce((s, c) => s + (c.cabezas || 0), 0);
-  const mixtos   = compras.filter(c => c.sexo === "mixto").reduce((s, c) => s + (c.cabezas || 0), 0);
+  const machos  = compras.reduce((s, c) => {
+    if (c.sexo === "macho")  return s + (c.cabezas || 0);
+    if (c.sexo === "mixto")  return s + (parseInt(c.machosCount) || 0);
+    return s;
+  }, 0);
+  const hembras = compras.reduce((s, c) => {
+    if (c.sexo === "hembra") return s + (c.cabezas || 0);
+    if (c.sexo === "mixto")  return s + (parseInt(c.hembrasCount) || 0);
+    return s;
+  }, 0);
   const dataSexo = [
     machos  > 0 && { name: "Machos",  value: machos,  color: T.teal },
     hembras > 0 && { name: "Hembras", value: hembras, color: T.brownLight },
-    mixtos  > 0 && { name: "Mixtos",  value: mixtos,  color: T.textMuted },
   ].filter(Boolean);
 
   // Por tipo de compra
@@ -819,7 +830,7 @@ function Stock({ T }) {
               </div>
               <div style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.8 }}>
                 <div>{c.productor} · {c.fecha}</div>
-                <div>{c.cabezas} cab. · {c.pesoPromedio} kg/cab · {c.sexo}</div>
+                <div>{c.cabezas} cab. · {c.pesoPromedio} kg/cab · {c.sexo === "mixto" ? (c.machosCount + "M / " + c.hembrasCount + "H") : c.sexo}</div>
                 <div style={{ color: c.stockRestante > 0 ? T.brownLight : T.textDim }}>
                   {c.stockRestante > 0 ? c.stockRestante + " sin asignar" : "Asignada completa"}
                 </div>
