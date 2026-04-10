@@ -169,34 +169,60 @@ function MapaCampo({ parcelas, infra, T }) {
     color: T.text, boxSizing: "border-box", outline: "none", fontFamily: "'Outfit', sans-serif",
   };
 
+  const cabPropias      = Object.entries(parcelas).filter(([k,v]) => v.tipo === "propio").reduce((s,[,v]) => s + (v.animales||0), 0);
+  const cabArrendadas   = Object.entries(parcelas).filter(([k,v]) => v.tipo === "arrendamiento").reduce((s,[,v]) => s + (v.animales||0), 0);
+
   return (
     <div>
-      {/* Toolbar */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
-          {[
-            { c: T.green,  label: "Animales propios" },
-            { c: T.teal,   label: "Arrendamiento" },
-            { c: T.border, label: "Vacío / Descanso" },
-          ].map(l => (
-            <div key={l.label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: T.textMuted }}>
-              <div style={{ width: 11, height: 11, borderRadius: 3, background: l.c + "38", border: "2px solid " + l.c }} />
-              {l.label}
-            </div>
-          ))}
+      {/* Boxes resumen + botón editar */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "stretch", marginBottom: 16, gap: 12 }}>
+        {/* Box arrendamiento */}
+        <div style={{ flex: 1, background: T.bgCard, border: "2px solid " + T.teal, borderRadius: 10, padding: "14px 20px", display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ width: 10, height: 10, borderRadius: 2, background: T.teal, flexShrink: 0 }} />
+          <div>
+            <div style={{ fontSize: 12, color: T.tealLight, fontWeight: 700, letterSpacing: "0.06em", marginBottom: 2 }}>ARRENDAMIENTO (P1–P4)</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: T.tealLight, lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>{cabArrendadas}</div>
+            <div style={{ fontSize: 12, color: T.textMuted, marginTop: 2 }}>cabezas pastoreando</div>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          {modoEdicion && (
-            <button onClick={() => { setModoEdicion(false); setShowAddInfra(null); }}
-              style={{ padding: "7px 14px", borderRadius: 6, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
-              Cancelar
+
+        {/* Box propios */}
+        <div style={{ flex: 1, background: T.bgCard, border: "2px solid " + T.green, borderRadius: 10, padding: "14px 20px", display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ width: 10, height: 10, borderRadius: 2, background: T.green, flexShrink: 0 }} />
+          <div>
+            <div style={{ fontSize: 12, color: T.greenLight, fontWeight: 700, letterSpacing: "0.06em", marginBottom: 2 }}>ANIMALES PROPIOS (P5–P8)</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: T.greenLight, lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>{cabPropias}</div>
+            <div style={{ fontSize: 12, color: T.textMuted, marginTop: 2 }}>cabezas pastoreando</div>
+          </div>
+        </div>
+
+        {/* Leyenda + botón */}
+        <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "flex-end", gap: 8 }}>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {[
+              { c: T.green,  label: "Propios" },
+              { c: T.teal,   label: "Arrendamiento" },
+              { c: T.border, label: "Descanso" },
+            ].map(l => (
+              <div key={l.label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: T.textMuted }}>
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: l.c + "38", border: "2px solid " + l.c }} />
+                {l.label}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {modoEdicion && (
+              <button onClick={() => { setModoEdicion(false); setShowAddInfra(null); }}
+                style={{ padding: "8px 16px", borderRadius: 6, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
+                Cancelar
+              </button>
+            )}
+            <button onClick={() => { setModoEdicion(v => !v); setShowAddInfra(null); setParcelaSelected(null); }}
+              style={{ padding: "8px 20px", borderRadius: 6, border: "none", fontSize: 13, cursor: "pointer", fontFamily: "'Outfit', sans-serif", fontWeight: 600,
+                background: modoEdicion ? T.brownLight : T.teal, color: "#fff" }}>
+              {modoEdicion ? "Guardar mapa" : "Editar mapa"}
             </button>
-          )}
-          <button onClick={() => { setModoEdicion(v => !v); setShowAddInfra(null); setParcelaSelected(null); }}
-            style={{ padding: "7px 18px", borderRadius: 6, border: "none", fontSize: 13, cursor: "pointer", fontFamily: "'Outfit', sans-serif", fontWeight: 600,
-              background: modoEdicion ? T.brownLight : T.teal, color: "#fff" }}>
-            {modoEdicion ? "Guardar mapa" : "Editar mapa"}
-          </button>
+          </div>
         </div>
       </div>
 
@@ -219,24 +245,13 @@ function MapaCampo({ parcelas, infra, T }) {
           userSelect: "none", position: "relative",
         }}>
 
-        {/* Zona header */}
-        <div style={{ display: "flex", borderBottom: "1px solid " + T.border }}>
-          <div style={{ flex: 4, padding: "5px 12px", fontSize: 13, fontWeight: 700, letterSpacing: "0.07em", color: T.teal, borderRight: "3px solid " + T.brownLight }}>
-            ARRENDAMIENTO — P1 a P4
-          </div>
-          <div style={{ flex: 1, padding: "5px 0", fontSize: 11, textAlign: "center", color: T.textDim, borderRight: "3px solid " + T.brownLight }}>P5</div>
-          <div style={{ flex: 3, padding: "5px 12px", fontSize: 13, fontWeight: 700, letterSpacing: "0.07em", color: T.green, textAlign: "right" }}>
-            PROPIO — P6 a P8
-          </div>
-        </div>
-
         {/* Potreros */}
         <div style={{ display: "flex", height: 260 }}>
           {[1,2,3,4,5,6,7,8].map(p => {
             const esP5 = p === 5;
             const keys = esP5 ? ["P" + p] : ["P" + p + ".1", "P" + p + ".2"];
             return (
-              <div key={p} style={{ flex: 1, borderRight: p < 8 ? "3px solid " + T.brownLight : "none", display: "flex" }}>
+              <div key={p} style={{ flex: 1, borderRight: p < 8 ? "4px solid " + T.brown : "none", display: "flex", position: "relative" }}>
                 {keys.map((key, idx) => {
                   const data = parcelas[key];
                   const col  = getColors(data);
