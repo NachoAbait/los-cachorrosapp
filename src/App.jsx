@@ -275,7 +275,7 @@ function MapaCampo({ parcelas, infra, T }) {
                           background: T.bgCard, border: "1px solid " + col.border, borderRadius: 8,
                           padding: "10px 14px", minWidth: 165, zIndex: 100, pointerEvents: "none",
                           boxShadow: "0 4px 20px " + T.shadow }}>
-                          <div style={{ fontWeight: 700, color: T.cream, marginBottom: 6, fontSize: 13, fontFamily: "'Playfair Display', serif" }}>{key}</div>
+                          <div style={{ fontWeight: 700, color: T.cream, marginBottom: 6, fontSize: 13, fontFamily: "'Barlow Condensed', sans-serif" }}>{key}</div>
                           <div style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.8 }}>
                             <div>Animales: <b style={{ color: T.text }}>{data.animales || "—"}</b></div>
                             <div>Estado: <b style={{ color: data.estado === "pastoreo" ? T.green : T.brownLight }}>{data.estado}</b></div>
@@ -385,7 +385,7 @@ function MapaCampo({ parcelas, infra, T }) {
         <div onClick={() => setShowInfraModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 12, padding: 24, minWidth: 340, maxWidth: 460, width: "90%", boxShadow: "0 8px 40px " + T.shadow }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: T.cream, fontWeight: 700 }}>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: T.cream, fontWeight: 700 }}>
                 {INFRA_ICONS[showInfraModal.tipo]} {showInfraModal.label}
               </div>
               {modoEdicion && (
@@ -524,7 +524,7 @@ function ParcelaPanel({ parcelaId, parcelaData, parcelas, T, onClose }) {
 
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: T.cream, fontWeight: 700 }}>
+        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: T.cream, fontWeight: 700 }}>
           <span style={{ color: T.brownLight }}>{parcelaId}</span>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -562,7 +562,7 @@ function ParcelaPanel({ parcelaId, parcelaData, parcelas, T, onClose }) {
       {/* Formulario rotación */}
       {showRotacion && (
         <div style={{ background: T.bgHover, border: "1px solid " + T.green, borderRadius: 10, padding: 18, marginBottom: 16 }}>
-          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, color: T.greenLight, marginBottom: 14, fontWeight: 700 }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, color: T.greenLight, marginBottom: 14, fontWeight: 700 }}>
             Nueva rotación desde {parcelaId}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
@@ -637,7 +637,8 @@ function ParcelaPanel({ parcelaId, parcelaData, parcelas, T, onClose }) {
 function Compras({ T, parcelas }) {
   const [compras, setCompras]         = useState([]);
   const [showForm, setShowForm]       = useState(false);
-  const [showAsignar, setShowAsignar] = useState(null); // compra a asignar
+  const [showAsignar, setShowAsignar] = useState(null);
+  const [showDetalle, setShowDetalle] = useState(null); // compra a asignar
   const [loading, setLoading]         = useState(false);
   const [asignarForm, setAsignarForm] = useState({ parcela: "", cantidad: 0 });
   const [form, setForm] = useState({
@@ -749,7 +750,7 @@ function Compras({ T, parcelas }) {
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
-          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, color: T.cream, fontWeight: 700 }}>Compras</div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, color: T.cream, fontWeight: 700 }}>Compras</div>
           <div style={{ fontSize: 13, color: T.textMuted, marginTop: 2 }}>Registro de tropas ingresadas al campo</div>
         </div>
         <button onClick={() => setShowForm(v => !v)}
@@ -761,7 +762,7 @@ function Compras({ T, parcelas }) {
       {/* Formulario nueva compra */}
       {showForm && (
         <div style={{ background: T.bgCard, border: "1px solid " + T.green, borderRadius: 10, padding: 22, marginBottom: 24 }}>
-          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 17, color: T.greenLight, marginBottom: 18, fontWeight: 700 }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 17, color: T.greenLight, marginBottom: 18, fontWeight: 700 }}>
             Nueva compra de hacienda
           </div>
 
@@ -870,11 +871,14 @@ function Compras({ T, parcelas }) {
         </div>
       ) : (
         compras.map(c => (
-          <div key={c.id} style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10, padding: 18, marginBottom: 12 }}>
+          <div key={c.id} onClick={() => setShowDetalle(c)}
+            style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10, padding: 18, marginBottom: 12, cursor: "pointer", transition: "border 0.15s" }}
+            onMouseEnter={e => e.currentTarget.style.borderColor = T.borderLight}
+            onMouseLeave={e => e.currentTarget.style.borderColor = T.border}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                  <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 17, color: T.cream, fontWeight: 700 }}>
+                  <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 17, color: T.cream, fontWeight: 700 }}>
                     Tropa {c.tropa}
                   </div>
                   <div style={{ padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
@@ -920,7 +924,7 @@ function Compras({ T, parcelas }) {
       {showAsignar && (
         <div onClick={() => setShowAsignar(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: T.bgCard, border: "1px solid " + T.teal, borderRadius: 12, padding: 24, minWidth: 340, maxWidth: 440, width: "90%", boxShadow: "0 8px 40px rgba(0,0,0,0.5)" }}>
-            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: T.cream, fontWeight: 700, marginBottom: 6 }}>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: T.cream, fontWeight: 700, marginBottom: 6 }}>
               Asignar tropa {showAsignar.tropa}
             </div>
             <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 18 }}>
@@ -955,6 +959,89 @@ function Compras({ T, parcelas }) {
           </div>
         </div>
       )}
+      {/* Modal detalle compra */}
+      {showDetalle && (
+        <div onClick={() => setShowDetalle(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 12, padding: 28, minWidth: 480, maxWidth: 580, width: "90%", boxShadow: "0 8px 40px rgba(0,0,0,0.6)", maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+              <div>
+                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 24, color: T.cream, fontWeight: 700, letterSpacing: "0.02em" }}>
+                  Tropa {showDetalle.tropa}
+                </div>
+                <div style={{ fontSize: 12, color: T.textMuted, marginTop: 2 }}>{showDetalle.fecha} · {showDetalle.productor}</div>
+              </div>
+              <div style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700,
+                background: showDetalle.sexo === "macho" ? T.teal + "22" : showDetalle.sexo === "hembra" ? T.brown + "22" : T.bgHover,
+                color: showDetalle.sexo === "macho" ? T.tealLight : showDetalle.sexo === "hembra" ? T.brownLight : T.textMuted,
+                border: "1px solid " + (showDetalle.sexo === "macho" ? T.teal : showDetalle.sexo === "hembra" ? T.brown : T.border) }}>
+                {showDetalle.sexo}
+              </div>
+            </div>
+
+            {/* Stats hacienda */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: "0.07em", marginBottom: 10 }}>HACIENDA</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 20 }}>
+              {[
+                { label: "Cabezas",         value: showDetalle.cabezas + " cab." },
+                { label: "Peso promedio",   value: showDetalle.pesoPromedio + " kg/cab" },
+                { label: "Kg totales",      value: fmt(showDetalle.kgTotal) + " kg" },
+                { label: "Stock asignado",  value: (showDetalle.cabezas - showDetalle.stockRestante) + " cab." },
+                { label: "Stock restante",  value: showDetalle.stockRestante + " cab." },
+                { label: "Moneda",          value: showDetalle.moneda },
+              ].map(s => (
+                <div key={s.label} style={{ background: T.bgHover, borderRadius: 8, padding: "10px 14px", border: "1px solid " + T.border }}>
+                  <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 3 }}>{s.label}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: T.text }}>{s.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Costos */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: "0.07em", marginBottom: 10 }}>COSTOS</div>
+            <div style={{ background: T.bgHover, borderRadius: 8, padding: "14px 18px", marginBottom: 20, border: "1px solid " + T.border }}>
+              {[
+                { label: "Precio x kg",        value: showDetalle.moneda + " " + fmt(showDetalle.precioKg) + "/kg" },
+                { label: "Subtotal hacienda",   value: showDetalle.moneda + " " + fmt(showDetalle.subTotal) },
+                { label: "IVA (" + showDetalle.iva + "%)", value: showDetalle.moneda + " " + fmt(showDetalle.ivaVal) },
+                { label: "Flete",               value: showDetalle.moneda + " " + fmt(showDetalle.flete) },
+                { label: "Otros gastos",        value: showDetalle.moneda + " " + fmt(showDetalle.otrosGastos) },
+              ].map((s, i) => (
+                <div key={s.label} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: i < 4 ? "1px solid " + T.border : "none", fontSize: 13 }}>
+                  <span style={{ color: T.textMuted }}>{s.label}</span>
+                  <span style={{ color: T.text, fontWeight: 600 }}>{s.value}</span>
+                </div>
+              ))}
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0 4px", fontSize: 15, marginTop: 4 }}>
+                <span style={{ color: T.cream, fontWeight: 700 }}>Total puesto en campo</span>
+                <span style={{ color: T.greenLight, fontWeight: 800 }}>{showDetalle.moneda} {fmt(showDetalle.total)}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                <span style={{ color: T.textMuted }}>Precio por kg puesto</span>
+                <span style={{ color: T.greenLight, fontWeight: 700 }}>{showDetalle.moneda} {fmt(showDetalle.pKgPuesto)}/kg</span>
+              </div>
+            </div>
+
+            {showDetalle.observaciones && (
+              <div style={{ fontSize: 13, color: T.textMuted, fontStyle: "italic", marginBottom: 16, padding: "10px 14px", background: T.bgHover, borderRadius: 8, borderLeft: "3px solid " + T.brownLight }}>
+                {showDetalle.observaciones}
+              </div>
+            )}
+
+            <button onClick={() => setShowDetalle(null)}
+              style={{ width: "100%", padding: "9px 0", borderRadius: 7, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+  return (
+    <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10, padding: 60, textAlign: "center" }}>
+      <div style={{ fontSize: 28, color: T.borderLight, marginBottom: 14 }}>◌</div>
+      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, color: T.cream, marginBottom: 8 }}>{label}</div>
+      <div style={{ color: T.textMuted, fontSize: 14 }}>Esta sección está en desarrollo</div>
     </div>
   );
 }
@@ -963,7 +1050,7 @@ function Placeholder({ label, T }) {
   return (
     <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10, padding: 60, textAlign: "center" }}>
       <div style={{ fontSize: 28, color: T.borderLight, marginBottom: 14 }}>◌</div>
-      <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: T.cream, marginBottom: 8 }}>{label}</div>
+      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, color: T.cream, marginBottom: 8, fontWeight: 700 }}>{label}</div>
       <div style={{ color: T.textMuted, fontSize: 14 }}>Esta sección está en desarrollo</div>
     </div>
   );
@@ -1002,7 +1089,7 @@ export default function App() {
 
   return (
     <>
-      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet" />
+      <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet" />
       <div style={{ minHeight: "100vh", background: T.bg, color: T.text, fontFamily: "'Outfit', sans-serif", display: "flex", transition: "background 0.3s" }}>
 
         <aside style={{ width: sidebarOpen ? 220 : 58, flexShrink: 0, background: T.bgSidebar, borderRight: "1px solid " + T.border, display: "flex", flexDirection: "column", transition: "width 0.22s ease", overflow: "hidden" }}>
@@ -1010,7 +1097,7 @@ export default function App() {
             <div style={{ width: 30, height: 30, borderRadius: 8, background: T.brown, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 15 }}>C</div>
             {sidebarOpen && (
               <div>
-                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 14, color: T.cream, fontWeight: 700, lineHeight: 1.15 }}>Los Cachorros</div>
+                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, color: T.cream, fontWeight: 700, lineHeight: 1.15 }}>Los Cachorros</div>
                 <div style={{ fontSize: 11, color: T.textMuted }}>Campo ganadero</div>
               </div>
             )}
@@ -1051,7 +1138,7 @@ export default function App() {
         <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
           <header style={{ padding: "14px 28px", borderBottom: "1px solid " + T.border, background: T.bgCard, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
-              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: T.cream, fontWeight: 700 }}>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, color: T.cream, fontWeight: 700 }}>
                 {NAV_ITEMS.find(n => n.id === tab)?.label}
               </div>
               <div style={{ fontSize: 12, color: T.textMuted, marginTop: 1 }}>
