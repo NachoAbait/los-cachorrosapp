@@ -1,413 +1,244 @@
 import { useState } from "react";
 
-// ─── PALETA & ESTILOS GLOBALES ────────────────────────────────────────────────
-const G = {
-  bg:        "#0f1a0e",
-  bgCard:    "#1a2718",
-  bgHover:   "#223520",
-  border:    "#2e4a2a",
-  borderLight:"#3d6438",
-  green:     "#4a9e3f",
-  greenLight:"#6bbf5f",
-  greenDim:  "#2d5c28",
-  gold:      "#c8a84a",
-  goldLight: "#e6c96a",
-  red:       "#c84a4a",
-  blue:      "#4a7ec8",
-  blueLight: "#6a9ee8",
-  text:      "#e8f0e6",
-  textMuted: "#8aab86",
-  textDim:   "#4a6a46",
-  cream:     "#f0ead8",
+const THEMES = {
+  dark: {
+    bg:          "#111614",
+    bgSidebar:   "#0d1210",
+    bgCard:      "#181f1c",
+    bgHover:     "#1f2923",
+    bgInput:     "#1f2923",
+    border:      "#283530",
+    borderLight: "#354840",
+    green:       "#4e9e43",
+    greenLight:  "#72c464",
+    teal:        "#3a8c7e",
+    tealLight:   "#56b8a8",
+    brown:       "#8c6a3a",
+    brownLight:  "#b8924e",
+    red:         "#c84a4a",
+    text:        "#dde8e2",
+    textMuted:   "#6a8a7e",
+    textDim:     "#344e48",
+    cream:       "#f0e8d8",
+    shadow:      "rgba(0,0,0,0.45)",
+    activeNavBg: "#1f2e28",
+    activeNavBorder: "#4e9e43",
+    activeNavColor:  "#72c464",
+  },
+  light: {
+    bg:          "#f0f4f2",
+    bgSidebar:   "#e4ede8",
+    bgCard:      "#ffffff",
+    bgHover:     "#eaf2ee",
+    bgInput:     "#f0f4f2",
+    border:      "#c0d4cc",
+    borderLight: "#9abfb4",
+    green:       "#357a2c",
+    greenLight:  "#2a6222",
+    teal:        "#22766a",
+    tealLight:   "#185e54",
+    brown:       "#7a5228",
+    brownLight:  "#6a4420",
+    red:         "#a83030",
+    text:        "#162420",
+    textMuted:   "#4a6e62",
+    textDim:     "#8aada4",
+    cream:       "#2a1e10",
+    shadow:      "rgba(0,0,0,0.10)",
+    activeNavBg: "#ddeee8",
+    activeNavBorder: "#357a2c",
+    activeNavColor:  "#1e5218",
+  },
 };
 
-const css = {
-  app: {
-    minHeight: "100vh",
-    background: G.bg,
-    color: G.text,
-    fontFamily: "'Crimson Pro', 'Georgia', serif",
-    display: "flex",
-    flexDirection: "column",
-  },
-  // NAV
-  nav: {
-    background: G.bgCard,
-    borderBottom: `2px solid ${G.border}`,
-    padding: "0 24px",
-    display: "flex",
-    alignItems: "center",
-    gap: 0,
-    overflowX: "auto",
-    flexShrink: 0,
-  },
-  navBrand: {
-    fontFamily: "'Playfair Display', 'Georgia', serif",
-    fontWeight: 700,
-    fontSize: 18,
-    color: G.gold,
-    letterSpacing: "0.05em",
-    paddingRight: 32,
-    paddingTop: 14,
-    paddingBottom: 14,
-    borderRight: `1px solid ${G.border}`,
-    marginRight: 8,
-    whiteSpace: "nowrap",
-    flexShrink: 0,
-  },
-  navTab: (active) => ({
-    padding: "14px 16px",
-    cursor: "pointer",
-    fontSize: 13,
-    fontFamily: "'Crimson Pro', serif",
-    fontWeight: active ? 700 : 400,
-    color: active ? G.greenLight : G.textMuted,
-    borderBottom: active ? `2px solid ${G.greenLight}` : "2px solid transparent",
-    marginBottom: -2,
-    whiteSpace: "nowrap",
-    transition: "all 0.15s",
-    letterSpacing: "0.03em",
-    flexShrink: 0,
-  }),
-  // MAIN
-  main: {
-    flex: 1,
-    padding: "24px",
-    maxWidth: 1400,
-    width: "100%",
-    margin: "0 auto",
-    boxSizing: "border-box",
-  },
-  pageTitle: {
-    fontFamily: "'Playfair Display', 'Georgia', serif",
-    fontSize: 26,
-    fontWeight: 700,
-    color: G.cream,
-    marginBottom: 4,
-    letterSpacing: "0.02em",
-  },
-  pageSubtitle: {
-    fontSize: 13,
-    color: G.textMuted,
-    marginBottom: 24,
-    fontStyle: "italic",
-  },
-  card: {
-    background: G.bgCard,
-    border: `1px solid ${G.border}`,
-    borderRadius: 8,
-    padding: 20,
-  },
-  btn: (variant = "primary") => ({
-    padding: "8px 16px",
-    borderRadius: 6,
-    border: variant === "primary" ? "none" : `1px solid ${G.border}`,
-    background: variant === "primary" ? G.green : variant === "danger" ? G.red : variant === "gold" ? G.gold : G.bgHover,
-    color: variant === "gold" ? G.bg : G.text,
-    cursor: "pointer",
-    fontSize: 13,
-    fontFamily: "'Crimson Pro', serif",
-    fontWeight: 600,
-    letterSpacing: "0.03em",
-    transition: "all 0.15s",
-  }),
-  badge: (color) => ({
-    display: "inline-block",
-    padding: "2px 8px",
-    borderRadius: 4,
-    fontSize: 11,
-    fontWeight: 700,
-    letterSpacing: "0.05em",
-    background: color === "green" ? G.greenDim : color === "gold" ? "#3a2e10" : color === "blue" ? "#1a2e4a" : "#2a1a1a",
-    color: color === "green" ? G.greenLight : color === "gold" ? G.goldLight : color === "blue" ? G.blueLight : G.red,
-    border: `1px solid ${color === "green" ? G.greenDim : color === "gold" ? "#5a4a20" : color === "blue" ? "#2a4a7a" : "#5a2a2a"}`,
-  }),
-};
+const NAV_ITEMS = [
+  { id: "campo",         icon: "▣", label: "Campo" },
+  { id: "stock",         icon: "◈", label: "Stock" },
+  { id: "compras",       icon: "◎", label: "Compras" },
+  { id: "arrendamiento", icon: "◇", label: "Arrendamiento" },
+  { id: "feedlot",       icon: "▦", label: "Feedlot & Faena" },
+  { id: "sanidad",       icon: "✦", label: "Sanidad" },
+  { id: "lluvias",       icon: "◌", label: "Lluvias" },
+  { id: "finanzas",      icon: "◈", label: "Finanzas" },
+  { id: "mantenimiento", icon: "◉", label: "Mantenimiento" },
+  { id: "dashboard",     icon: "▤", label: "Dashboard" },
+];
 
-// ─── DATOS DEMO ───────────────────────────────────────────────────────────────
 const initialParcelas = {
-  "P1.1": { animales: 0, estado: "descanso", diasEstado: 12, tropa: null, tipo: null },
-  "P1.2": { animales: 45, estado: "pastoreo", diasEstado: 5, tropa: "T-2024-01", tipo: "arrendamiento" },
-  "P2.1": { animales: 38, estado: "pastoreo", diasEstado: 3, tropa: "T-2024-02", tipo: "arrendamiento" },
-  "P2.2": { animales: 0, estado: "descanso", diasEstado: 8, tropa: null, tipo: null },
-  "P3.1": { animales: 0, estado: "descanso", diasEstado: 15, tropa: null, tipo: null },
-  "P3.2": { animales: 52, estado: "pastoreo", diasEstado: 7, tropa: "T-2024-03", tipo: "arrendamiento" },
-  "P4.1": { animales: 41, estado: "pastoreo", diasEstado: 4, tropa: "T-2024-04", tipo: "arrendamiento" },
-  "P4.2": { animales: 0, estado: "descanso", diasEstado: 20, tropa: null, tipo: null },
-  "P5":   { animales: 0, estado: "descanso", diasEstado: 0, tropa: null, tipo: null },
-  "P6.1": { animales: 0, estado: "descanso", diasEstado: 10, tropa: null, tipo: null },
-  "P6.2": { animales: 63, estado: "pastoreo", diasEstado: 6, tropa: "T-2024-05", tipo: "propio" },
-  "P7.1": { animales: 57, estado: "pastoreo", diasEstado: 9, tropa: "T-2024-06", tipo: "propio" },
-  "P7.2": { animales: 0, estado: "descanso", diasEstado: 14, tropa: null, tipo: null },
-  "P8.1": { animales: 0, estado: "descanso", diasEstado: 18, tropa: null, tipo: null },
+  "P1.1": { animales: 0,  estado: "descanso", diasEstado: 12, tropa: null,        tipo: null },
+  "P1.2": { animales: 45, estado: "pastoreo", diasEstado: 5,  tropa: "T-2024-01", tipo: "arrendamiento" },
+  "P2.1": { animales: 38, estado: "pastoreo", diasEstado: 3,  tropa: "T-2024-02", tipo: "arrendamiento" },
+  "P2.2": { animales: 0,  estado: "descanso", diasEstado: 8,  tropa: null,        tipo: null },
+  "P3.1": { animales: 0,  estado: "descanso", diasEstado: 15, tropa: null,        tipo: null },
+  "P3.2": { animales: 52, estado: "pastoreo", diasEstado: 7,  tropa: "T-2024-03", tipo: "arrendamiento" },
+  "P4.1": { animales: 41, estado: "pastoreo", diasEstado: 4,  tropa: "T-2024-04", tipo: "arrendamiento" },
+  "P4.2": { animales: 0,  estado: "descanso", diasEstado: 20, tropa: null,        tipo: null },
+  "P5":   { animales: 0,  estado: "descanso", diasEstado: 0,  tropa: null,        tipo: null },
+  "P6.1": { animales: 0,  estado: "descanso", diasEstado: 10, tropa: null,        tipo: null },
+  "P6.2": { animales: 63, estado: "pastoreo", diasEstado: 6,  tropa: "T-2024-05", tipo: "propio" },
+  "P7.1": { animales: 57, estado: "pastoreo", diasEstado: 9,  tropa: "T-2024-06", tipo: "propio" },
+  "P7.2": { animales: 0,  estado: "descanso", diasEstado: 14, tropa: null,        tipo: null },
+  "P8.1": { animales: 0,  estado: "descanso", diasEstado: 18, tropa: null,        tipo: null },
   "P8.2": { animales: 49, estado: "pastoreo", diasEstado: 11, tropa: "T-2024-07", tipo: "propio" },
 };
 
-const initialInfraestructura = [
-  { id: 1, tipo: "casa",    label: "Casa",       x: 51, y: 30, icono: "🏠", registros: [{ fecha: "2024-01-15", desc: "Refacción techo" }] },
-  { id: 2, tipo: "molino",  label: "Molino 1",   x: 18, y: 20, icono: "⚙️", registros: [{ fecha: "2024-03-10", desc: "Cambio de aspa" }] },
-  { id: 3, tipo: "molino",  label: "Molino 2",   x: 72, y: 75, icono: "⚙️", registros: [] },
-  { id: 4, tipo: "tanque",  label: "Tanque 1",   x: 20, y: 60, icono: "🔵", registros: [{ fecha: "2024-02-20", desc: "Limpieza" }] },
-  { id: 5, tipo: "tanque",  label: "Tanque 2",   x: 75, y: 40, icono: "🔵", registros: [] },
-  { id: 6, tipo: "bebida",  label: "Bebida P3",  x: 36, y: 70, icono: "💧", registros: [] },
-  { id: 7, tipo: "manga",   label: "Manga",      x: 85, y: 20, icono: "🔧", registros: [{ fecha: "2024-04-01", desc: "Reparación cerrojo" }] },
+const initialInfra = [
+  { id: 1, tipo: "casa",   label: "Casa",      x: 51, y: 35, registros: [{ fecha: "2024-01-15", desc: "Refacción techo" }] },
+  { id: 2, tipo: "molino", label: "Molino 1",  x: 18, y: 25, registros: [{ fecha: "2024-03-10", desc: "Cambio de aspa" }] },
+  { id: 3, tipo: "molino", label: "Molino 2",  x: 72, y: 70, registros: [] },
+  { id: 4, tipo: "tanque", label: "Tanque 1",  x: 20, y: 65, registros: [{ fecha: "2024-02-20", desc: "Limpieza" }] },
+  { id: 5, tipo: "tanque", label: "Tanque 2",  x: 75, y: 45, registros: [] },
+  { id: 6, tipo: "bebida", label: "Bebida P3", x: 36, y: 72, registros: [] },
+  { id: 7, tipo: "manga",  label: "Manga",     x: 86, y: 22, registros: [{ fecha: "2024-04-01", desc: "Reparación cerrojo" }] },
 ];
 
-const TABS = [
-  { id: "campo",         label: "🗺️ Campo" },
-  { id: "stock",         label: "🐄 Stock" },
-  { id: "compras",       label: "🛒 Compras" },
-  { id: "arrendamiento", label: "🤝 Arrendamiento" },
-  { id: "feedlot",       label: "🏗️ Feedlot & Faena" },
-  { id: "sanidad",       label: "💉 Sanidad" },
-  { id: "lluvias",       label: "🌧️ Lluvias" },
-  { id: "finanzas",      label: "💰 Finanzas" },
-  { id: "mantenimiento", label: "🔧 Mantenimiento" },
-  { id: "dashboard",     label: "📊 Dashboard" },
-];
+const INFRA_ICONS = { casa: "⌂", molino: "⊛", tanque: "◉", bebida: "◎", manga: "⊞", otro: "◆" };
 
-// ─── COMPONENTE MAPA ──────────────────────────────────────────────────────────
-function MapaCampo({ parcelas, setParcelas, infraestructura, setInfraestructura }) {
-  const [modoEdicion, setModoEdicion] = useState(false);
-  const [parcelaSeleccionada, setParcelaSeleccionada] = useState(null);
-  const [infraSeleccionada, setInfraSeleccionada] = useState(null);
-  const [hoveredParcela, setHoveredParcela] = useState(null);
-  const [showAddInfra, setShowAddInfra] = useState(null); // {x, y} click en modo edición
-  const [showInfraModal, setShowInfraModal] = useState(null);
-  const [newInfraForm, setNewInfraForm] = useState({ tipo: "molino", label: "" });
-  const [newRegistro, setNewRegistro] = useState({ fecha: "", desc: "" });
+function MapaCampo({ parcelas, setParcelas, infra, setInfra, T }) {
+  const [modoEdicion, setModoEdicion]         = useState(false);
+  const [parcelaSelected, setParcelaSelected] = useState(null);
+  const [hoveredParcela, setHoveredParcela]   = useState(null);
+  const [showAddInfra, setShowAddInfra]       = useState(null);
+  const [showInfraModal, setShowInfraModal]   = useState(null);
+  const [newInfraForm, setNewInfraForm]       = useState({ tipo: "molino", label: "" });
+  const [newRegistro, setNewRegistro]         = useState({ fecha: "", desc: "" });
 
-  // Potreros: P1..P8, cada uno con 2 parcelas salvo P5
-  const potreros = [1, 2, 3, 4, 5, 6, 7, 8];
-
-  const getParcelaColor = (key, data) => {
-    if (!data || data.animales === 0) return { bg: G.bgHover, border: G.border, label: "Vacío" };
-    if (data.tipo === "arrendamiento") return { bg: "#1a2a3a", border: G.blue, label: "Arrendamiento" };
-    if (data.tipo === "propio") return { bg: "#1a2e18", border: G.green, label: "Propio" };
-    return { bg: G.bgHover, border: G.borderLight, label: "Sin definir" };
-  };
-
-  const handleParcelaClick = (key) => {
-    if (modoEdicion) return;
-    setParcelaSeleccionada(key === parcelaSeleccionada ? null : key);
-    setInfraSeleccionada(null);
+  const getColors = (data) => {
+    if (!data || data.animales === 0) return { bg: T.bgHover, border: T.border, text: T.textDim };
+    if (data.tipo === "arrendamiento")  return { bg: T.teal + "18", border: T.teal, text: T.tealLight };
+    if (data.tipo === "propio")         return { bg: T.green + "18", border: T.green, text: T.greenLight };
+    return { bg: T.bgHover, border: T.borderLight, text: T.textMuted };
   };
 
   const handleMapClick = (e) => {
     if (!modoEdicion) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    setShowAddInfra({ x: parseFloat(x.toFixed(1)), y: parseFloat(y.toFixed(1)) });
+    const x = parseFloat((((e.clientX - rect.left) / rect.width) * 100).toFixed(1));
+    const y = parseFloat((((e.clientY - rect.top) / rect.height) * 100).toFixed(1));
+    setShowAddInfra({ x, y });
   };
 
   const handleAddInfra = () => {
     if (!newInfraForm.label) return;
-    const iconos = { molino: "⚙️", tanque: "🔵", bebida: "💧", manga: "🔧", otro: "📌" };
-    const nuevo = {
-      id: Date.now(),
-      tipo: newInfraForm.tipo,
-      label: newInfraForm.label,
-      x: showAddInfra.x,
-      y: showAddInfra.y,
-      icono: iconos[newInfraForm.tipo] || "📌",
-      registros: [],
-    };
-    setInfraestructura(prev => [...prev, nuevo]);
+    setInfra(prev => [...prev, { id: Date.now(), tipo: newInfraForm.tipo, label: newInfraForm.label, x: showAddInfra.x, y: showAddInfra.y, registros: [] }]);
     setShowAddInfra(null);
     setNewInfraForm({ tipo: "molino", label: "" });
   };
 
-  const handleDeleteInfra = (id) => {
-    setInfraestructura(prev => prev.filter(i => i.id !== id));
-    setShowInfraModal(null);
-  };
-
-  const handleAddRegistro = (id) => {
+  const handleAddRegistro = (infraId) => {
     if (!newRegistro.fecha || !newRegistro.desc) return;
-    setInfraestructura(prev => prev.map(i =>
-      i.id === id ? { ...i, registros: [...i.registros, { ...newRegistro }] } : i
-    ));
+    const reg = { ...newRegistro };
+    setInfra(prev => prev.map(i => i.id === infraId ? { ...i, registros: [...i.registros, reg] } : i));
+    setShowInfraModal(prev => ({ ...prev, registros: [...prev.registros, reg] }));
     setNewRegistro({ fecha: "", desc: "" });
   };
 
-  const parcelaData = parcelaSeleccionada ? parcelas[parcelaSeleccionada] : null;
-  const historial = [
-    { fecha: "2024-10-01", evento: "Ingreso tropa T-2024-06", animales: 57 },
-    { fecha: "2024-09-15", evento: "Salida a P7.2", animales: 57 },
-    { fecha: "2024-08-20", evento: "Ingreso tropa T-2024-05", animales: 60 },
-    { fecha: "2024-08-01", evento: "Descanso iniciado", animales: 0 },
-  ];
+  const parcelaData = parcelaSelected ? parcelas[parcelaSelected] : null;
+
+  const inp = {
+    width: "100%", padding: "8px 10px", borderRadius: 6, fontSize: 13,
+    background: T.bgInput, border: "1px solid " + T.border,
+    color: T.text, boxSizing: "border-box", outline: "none", fontFamily: "'Outfit', sans-serif",
+  };
 
   return (
     <div>
-      {/* Header mapa */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <div>
-          <div style={{ fontSize: 13, color: G.textMuted }}>
-            {modoEdicion
-              ? "✏️ Modo edición — hacé click en el mapa para agregar infraestructura"
-              : "Hacé click en una parcela para ver su historial"}
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          {modoEdicion && (
-            <button style={css.btn("danger")} onClick={() => { setModoEdicion(false); setShowAddInfra(null); }}>
-              ✕ Cancelar
-            </button>
-          )}
-          <button
-            style={css.btn(modoEdicion ? "gold" : "secondary")}
-            onClick={() => { setModoEdicion(!modoEdicion); setShowAddInfra(null); setParcelaSeleccionada(null); }}
-          >
-            {modoEdicion ? "💾 Guardar" : "✏️ Editar mapa"}
-          </button>
-        </div>
-      </div>
-
-      {/* Leyenda */}
-      {!modoEdicion && (
-        <div style={{ display: "flex", gap: 16, marginBottom: 12, flexWrap: "wrap" }}>
+      {/* Toolbar */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
           {[
-            { color: G.green, border: G.green, bg: "#1a2e18", label: "Animales propios" },
-            { color: G.blue,  border: G.blue,  bg: "#1a2a3a", label: "Arrendamiento" },
-            { color: G.textDim, border: G.border, bg: G.bgHover, label: "Vacío / Descanso" },
+            { c: T.green, label: "Animales propios" },
+            { c: T.teal,  label: "Arrendamiento" },
+            { c: T.border,label: "Vacío / Descanso" },
           ].map(l => (
-            <div key={l.label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: G.textMuted }}>
-              <div style={{ width: 14, height: 14, borderRadius: 3, background: l.bg, border: `2px solid ${l.border}` }} />
+            <div key={l.label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: T.textMuted }}>
+              <div style={{ width: 11, height: 11, borderRadius: 3, background: l.c + "28", border: "2px solid " + l.c }} />
               {l.label}
             </div>
           ))}
         </div>
-      )}
+        <div style={{ display: "flex", gap: 8 }}>
+          {modoEdicion && (
+            <button onClick={() => { setModoEdicion(false); setShowAddInfra(null); }}
+              style={{ padding: "7px 14px", borderRadius: 6, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
+              Cancelar
+            </button>
+          )}
+          <button onClick={() => { setModoEdicion(v => !v); setShowAddInfra(null); setParcelaSelected(null); }}
+            style={{ padding: "7px 18px", borderRadius: 6, border: "none", fontSize: 13, cursor: "pointer", fontFamily: "'Outfit', sans-serif", fontWeight: 600,
+              background: modoEdicion ? T.brownLight : T.teal, color: "#fff" }}>
+            {modoEdicion ? "Guardar mapa" : "Editar mapa"}
+          </button>
+        </div>
+      </div>
 
       {/* MAPA */}
-      <div
-        style={{
-          ...css.card,
-          padding: 0,
-          position: "relative",
-          overflow: "hidden",
-          cursor: modoEdicion ? "crosshair" : "default",
-          userSelect: "none",
-        }}
-        onClick={handleMapClick}
-      >
-        {/* Zona arrendamiento / propio labels */}
-        <div style={{
-          display: "flex",
-          borderBottom: `1px solid ${G.border}`,
-          fontSize: 11,
-          color: G.textDim,
-          letterSpacing: "0.08em",
-          fontWeight: 700,
-        }}>
-          <div style={{ flex: 4, borderRight: `1px solid ${G.border}`, padding: "4px 8px", color: G.blue, background: "rgba(74,126,200,0.05)" }}>
-            ◀ ZONA ARRENDAMIENTO (P1–P4)
+      <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10, overflow: "hidden", boxShadow: "0 2px 12px " + T.shadow, cursor: modoEdicion ? "crosshair" : "default", userSelect: "none", position: "relative" }}
+        onClick={handleMapClick}>
+
+        {/* Zona header */}
+        <div style={{ display: "flex", borderBottom: "1px solid " + T.border }}>
+          <div style={{ flex: 4, padding: "5px 12px", fontSize: 11, fontWeight: 700, letterSpacing: "0.07em", color: T.teal, borderRight: "1px solid " + T.border }}>
+            ARRENDAMIENTO — P1 a P4
           </div>
-          <div style={{ flex: 1, borderRight: `1px solid ${G.border}`, padding: "4px 8px", textAlign: "center" }}>
-            P5
-          </div>
-          <div style={{ flex: 3, padding: "4px 8px", color: G.green, background: "rgba(74,158,63,0.05)", textAlign: "right" }}>
-            ZONA PROPIA (P6–P8) ▶
+          <div style={{ flex: 1, padding: "5px 0", fontSize: 11, textAlign: "center", color: T.textDim, borderRight: "1px solid " + T.border }}>P5</div>
+          <div style={{ flex: 3, padding: "5px 12px", fontSize: 11, fontWeight: 700, letterSpacing: "0.07em", color: T.green, textAlign: "right" }}>
+            PROPIO — P6 a P8
           </div>
         </div>
 
         {/* Potreros */}
-        <div style={{ display: "flex", height: 220 }}>
-          {potreros.map((p) => {
+        <div style={{ display: "flex", height: 200 }}>
+          {[1,2,3,4,5,6,7,8].map(p => {
             const esP5 = p === 5;
-            const parcKeys = esP5 ? [`P${p}`] : [`P${p}.1`, `P${p}.2`];
-
+            const keys = esP5 ? ["P" + p] : ["P" + p + ".1", "P" + p + ".2"];
             return (
-              <div
-                key={p}
-                style={{
-                  flex: 1,
-                  borderRight: p < 8 ? `2px solid ${G.border}` : "none",
-                  display: "flex",
-                  flexDirection: "row",
-                  position: "relative",
-                }}
-              >
-                {parcKeys.map((key, idx) => {
+              <div key={p} style={{ flex: 1, borderRight: p < 8 ? "2px solid " + T.border : "none", display: "flex" }}>
+                {keys.map((key, idx) => {
                   const data = parcelas[key];
-                  const colors = getParcelaColor(key, data);
-                  const isSelected = parcelaSeleccionada === key;
-                  const isHovered = hoveredParcela === key;
-
+                  const col  = getColors(data);
+                  const sel  = parcelaSelected === key;
+                  const hov  = hoveredParcela === key;
                   return (
-                    <div
-                      key={key}
-                      onClick={(e) => { e.stopPropagation(); handleParcelaClick(key); }}
+                    <div key={key}
+                      onClick={e => { e.stopPropagation(); if (!modoEdicion) setParcelaSelected(sel ? null : key); }}
                       onMouseEnter={() => !modoEdicion && setHoveredParcela(key)}
                       onMouseLeave={() => setHoveredParcela(null)}
                       style={{
                         flex: 1,
-                        borderRight: !esP5 && idx === 0 ? `1px dashed ${G.borderLight}` : "none",
-                        background: isSelected ? colors.border + "33" : isHovered ? colors.bg + "cc" : colors.bg,
-                        border: isSelected ? `2px solid ${colors.border}` : "none",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
+                        borderRight: !esP5 && idx === 0 ? "1px dashed " + T.borderLight : "none",
+                        background: sel ? col.border + "28" : hov ? col.border + "14" : col.bg,
+                        outline: sel ? "2px solid " + col.border : "none",
+                        outlineOffset: -2,
+                        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                         cursor: modoEdicion ? "crosshair" : "pointer",
-                        transition: "all 0.15s",
-                        position: "relative",
-                        padding: 4,
-                      }}
-                    >
-                      {/* Título parcela */}
-                      <div style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: data?.animales > 0 ? (data.tipo === "arrendamiento" ? G.blueLight : G.greenLight) : G.textDim,
-                        letterSpacing: "0.05em",
-                        marginBottom: 4,
+                        transition: "background 0.12s", position: "relative", padding: 4,
                       }}>
-                        {esP5 ? "P5 🏠" : key}
-                      </div>
-
-                      {/* Info principal */}
-                      {!modoEdicion && data?.animales > 0 ? (
+                      <div style={{ fontSize: 10, fontWeight: 700, color: col.text, letterSpacing: "0.04em", marginBottom: 3 }}>{key}</div>
+                      {!modoEdicion && data && data.animales > 0 ? (
                         <>
-                          <div style={{ fontSize: 20, fontWeight: 700, color: data.tipo === "arrendamiento" ? G.blueLight : G.greenLight, lineHeight: 1 }}>
-                            {data.animales}
-                          </div>
-                          <div style={{ fontSize: 10, color: G.textMuted, marginTop: 2 }}>cabezas</div>
-                          <div style={{ fontSize: 10, color: G.gold, marginTop: 3 }}>
-                            {data.diasEstado}d pastoreo
-                          </div>
+                          <div style={{ fontSize: 21, fontWeight: 800, color: col.text, lineHeight: 1 }}>{data.animales}</div>
+                          <div style={{ fontSize: 9, color: T.textMuted, marginTop: 1 }}>cabezas</div>
+                          <div style={{ fontSize: 9, color: T.brownLight, marginTop: 3, fontWeight: 600 }}>{data.diasEstado}d pastoreo</div>
                         </>
                       ) : !modoEdicion ? (
-                        <div style={{ fontSize: 11, color: G.textDim, fontStyle: "italic" }}>
-                          {data?.diasEstado > 0 ? `${data.diasEstado}d descanso` : "Vacío"}
+                        <div style={{ fontSize: 10, color: T.textDim, fontStyle: "italic" }}>
+                          {data && data.diasEstado > 0 ? data.diasEstado + "d desc." : "Vacío"}
                         </div>
                       ) : null}
 
-                      {/* Hover tooltip */}
-                      {isHovered && !modoEdicion && data && (
-                        <div style={{
-                          position: "absolute",
-                          bottom: "calc(100% + 8px)",
-                          left: "50%",
-                          transform: "translateX(-50%)",
-                          background: "#0a1409",
-                          border: `1px solid ${colors.border}`,
-                          borderRadius: 6,
-                          padding: "10px 14px",
-                          minWidth: 160,
-                          zIndex: 100,
-                          pointerEvents: "none",
-                          boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
-                        }}>
-                          <div style={{ fontWeight: 700, color: G.cream, marginBottom: 6, fontSize: 13 }}>{key}</div>
-                          <div style={{ fontSize: 12, color: G.textMuted, lineHeight: 1.6 }}>
-                            <div>🐄 <b style={{ color: G.text }}>{data.animales}</b> animales</div>
-                            <div>📅 Estado: <b style={{ color: data.estado === "pastoreo" ? G.greenLight : G.gold }}>{data.estado}</b></div>
-                            <div>⏱️ <b style={{ color: G.text }}>{data.diasEstado}</b> días en estado</div>
-                            {data.tropa && <div>🏷️ Tropa: <b style={{ color: G.goldLight }}>{data.tropa}</b></div>}
-                            {data.tipo && <div>📋 <b style={{ color: data.tipo === "arrendamiento" ? G.blueLight : G.greenLight }}>{data.tipo}</b></div>}
+                      {hov && !modoEdicion && data && (
+                        <div style={{ position: "absolute", bottom: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)",
+                          background: T.bgCard, border: "1px solid " + col.border, borderRadius: 8,
+                          padding: "10px 14px", minWidth: 165, zIndex: 100, pointerEvents: "none",
+                          boxShadow: "0 4px 20px " + T.shadow }}>
+                          <div style={{ fontWeight: 700, color: T.cream, marginBottom: 6, fontSize: 13, fontFamily: "'Playfair Display', serif" }}>{key}</div>
+                          <div style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.8 }}>
+                            <div>Animales: <b style={{ color: T.text }}>{data.animales || "—"}</b></div>
+                            <div>Estado: <b style={{ color: data.estado === "pastoreo" ? T.green : T.brownLight }}>{data.estado}</b></div>
+                            <div>Días: <b style={{ color: T.text }}>{data.diasEstado}</b></div>
+                            {data.tropa && <div>Tropa: <b style={{ color: T.brownLight }}>{data.tropa}</b></div>}
+                            {data.tipo && <div>Uso: <b style={{ color: data.tipo === "arrendamiento" ? T.teal : T.green }}>{data.tipo}</b></div>}
                           </div>
                         </div>
                       )}
@@ -419,279 +250,230 @@ function MapaCampo({ parcelas, setParcelas, infraestructura, setInfraestructura 
           })}
         </div>
 
-        {/* Infraestructura overlay */}
-        <div style={{ position: "absolute", top: 30, left: 0, right: 0, bottom: 0, pointerEvents: "none" }}>
-          {infraestructura.map((infra) => (
-            <div
-              key={infra.id}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (modoEdicion) {
-                  setShowInfraModal(infra);
-                } else {
-                  setShowInfraModal(infra);
-                }
-              }}
-              style={{
-                position: "absolute",
-                left: `${infra.x}%`,
-                top: `${infra.y}%`,
-                transform: "translate(-50%, -50%)",
-                fontSize: infra.tipo === "casa" ? 22 : 16,
-                cursor: "pointer",
-                pointerEvents: "all",
-                filter: modoEdicion ? "drop-shadow(0 0 6px #c8a84a)" : "drop-shadow(0 2px 4px rgba(0,0,0,0.5))",
-                transition: "all 0.2s",
-                zIndex: 10,
-              }}
-              title={infra.label}
-            >
-              {infra.icono}
+        {/* Infra overlay */}
+        <div style={{ position: "absolute", top: 28, left: 0, right: 0, bottom: 0, pointerEvents: "none" }}>
+          {infra.map(item => (
+            <div key={item.id} onClick={e => { e.stopPropagation(); setShowInfraModal(item); }} title={item.label}
+              style={{ position: "absolute", left: item.x + "%", top: item.y + "%", transform: "translate(-50%,-50%)",
+                fontSize: item.tipo === "casa" ? 20 : 15, cursor: "pointer", pointerEvents: "all", zIndex: 10,
+                color: T.brownLight, filter: modoEdicion ? "drop-shadow(0 0 5px " + T.brownLight + ")" : "none" }}>
+              {INFRA_ICONS[item.tipo] || "◆"}
             </div>
           ))}
         </div>
 
-        {/* Click en modo edición para agregar infra */}
+        {/* Popup agregar infra */}
         {showAddInfra && modoEdicion && (
-          <div
-            style={{
-              position: "absolute",
-              left: `${showAddInfra.x}%`,
-              top: `${showAddInfra.y + 10}%`,
-              background: "#0a1409",
-              border: `1px solid ${G.gold}`,
-              borderRadius: 8,
-              padding: 14,
-              zIndex: 200,
-              minWidth: 200,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.7)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ fontWeight: 700, color: G.gold, marginBottom: 10, fontSize: 13 }}>
-              ➕ Agregar infraestructura
-            </div>
-            <select
-              value={newInfraForm.tipo}
-              onChange={e => setNewInfraForm(f => ({ ...f, tipo: e.target.value }))}
-              style={{ width: "100%", marginBottom: 8, padding: "6px 8px", background: G.bgHover, border: `1px solid ${G.border}`, color: G.text, borderRadius: 4, fontSize: 13 }}
-            >
-              <option value="molino">⚙️ Molino</option>
-              <option value="tanque">🔵 Tanque</option>
-              <option value="bebida">💧 Bebida</option>
-              <option value="manga">🔧 Manga</option>
-              <option value="otro">📌 Otro</option>
+          <div onClick={e => e.stopPropagation()} style={{
+            position: "absolute", left: Math.min(showAddInfra.x, 72) + "%", top: Math.min(showAddInfra.y + 5, 55) + "%",
+            background: T.bgCard, border: "1px solid " + T.brownLight, borderRadius: 10,
+            padding: 16, zIndex: 200, minWidth: 210, boxShadow: "0 6px 30px " + T.shadow }}>
+            <div style={{ fontWeight: 700, color: T.brownLight, marginBottom: 12, fontSize: 13 }}>Agregar infraestructura</div>
+            <select value={newInfraForm.tipo} onChange={e => setNewInfraForm(f => ({ ...f, tipo: e.target.value }))} style={{ ...inp, marginBottom: 8 }}>
+              <option value="molino">Molino</option>
+              <option value="tanque">Tanque</option>
+              <option value="bebida">Bebida</option>
+              <option value="manga">Manga</option>
+              <option value="otro">Otro</option>
             </select>
-            <input
-              placeholder="Nombre (ej: Molino Norte)"
-              value={newInfraForm.label}
-              onChange={e => setNewInfraForm(f => ({ ...f, label: e.target.value }))}
-              style={{ width: "100%", marginBottom: 10, padding: "6px 8px", background: G.bgHover, border: `1px solid ${G.border}`, color: G.text, borderRadius: 4, fontSize: 13, boxSizing: "border-box" }}
-            />
+            <input placeholder="Nombre (ej: Molino Norte)" value={newInfraForm.label}
+              onChange={e => setNewInfraForm(f => ({ ...f, label: e.target.value }))} style={{ ...inp, marginBottom: 12 }} />
             <div style={{ display: "flex", gap: 8 }}>
-              <button style={{ ...css.btn("primary"), flex: 1 }} onClick={handleAddInfra}>Agregar</button>
-              <button style={{ ...css.btn("secondary"), flex: 1 }} onClick={() => setShowAddInfra(null)}>Cancelar</button>
+              <button onClick={handleAddInfra} style={{ flex: 1, padding: "7px 0", borderRadius: 6, border: "none", background: T.teal, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>Agregar</button>
+              <button onClick={() => setShowAddInfra(null)} style={{ flex: 1, padding: "7px 0", borderRadius: 6, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>Cancelar</button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Modal infraestructura */}
+      {/* Modal infra */}
       {showInfraModal && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
-          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
-        }} onClick={() => setShowInfraModal(null)}>
-          <div style={{
-            ...css.card,
-            minWidth: 340, maxWidth: 480, width: "90%",
-            boxShadow: "0 8px 40px rgba(0,0,0,0.8)",
-          }} onClick={e => e.stopPropagation()}>
+        <div onClick={() => setShowInfraModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 12, padding: 24, minWidth: 340, maxWidth: 460, width: "90%", boxShadow: "0 8px 40px " + T.shadow }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: G.cream }}>
-                {showInfraModal.icono} {showInfraModal.label}
-              </div>
+              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: T.cream, fontWeight: 700 }}>{showInfraModal.label}</div>
               {modoEdicion && (
-                <button style={css.btn("danger")} onClick={() => handleDeleteInfra(showInfraModal.id)}>
-                  🗑 Eliminar
+                <button onClick={() => { setInfra(p => p.filter(i => i.id !== showInfraModal.id)); setShowInfraModal(null); }}
+                  style={{ padding: "5px 12px", borderRadius: 6, border: "none", background: T.red + "22", color: T.red, cursor: "pointer", fontSize: 12, fontFamily: "'Outfit', sans-serif" }}>
+                  Eliminar
                 </button>
               )}
             </div>
-
-            <div style={{ fontSize: 13, color: G.textMuted, marginBottom: 12 }}>
-              Tipo: <span style={{ color: G.goldLight }}>{showInfraModal.tipo}</span> · 
-              Pos: {showInfraModal.x}%, {showInfraModal.y}%
-            </div>
-
-            {/* Registros existentes */}
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: G.textMuted, marginBottom: 8, letterSpacing: "0.05em" }}>
-                HISTORIAL DE ARREGLOS
-              </div>
-              {showInfraModal.registros.length === 0 ? (
-                <div style={{ fontSize: 12, color: G.textDim, fontStyle: "italic" }}>Sin registros</div>
-              ) : (
-                showInfraModal.registros.map((r, i) => (
-                  <div key={i} style={{ fontSize: 12, color: G.text, padding: "6px 10px", background: G.bgHover, borderRadius: 4, marginBottom: 4, borderLeft: `2px solid ${G.gold}` }}>
-                    <span style={{ color: G.gold }}>{r.fecha}</span> — {r.desc}
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Agregar registro */}
-            <div style={{ borderTop: `1px solid ${G.border}`, paddingTop: 14 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: G.textMuted, marginBottom: 8, letterSpacing: "0.05em" }}>
-                AGREGAR REGISTRO
-              </div>
-              <input
-                type="date"
-                value={newRegistro.fecha}
-                onChange={e => setNewRegistro(r => ({ ...r, fecha: e.target.value }))}
-                style={{ width: "100%", marginBottom: 8, padding: "6px 8px", background: G.bgHover, border: `1px solid ${G.border}`, color: G.text, borderRadius: 4, fontSize: 13, boxSizing: "border-box" }}
-              />
-              <input
-                placeholder="Descripción del arreglo..."
-                value={newRegistro.desc}
-                onChange={e => setNewRegistro(r => ({ ...r, desc: e.target.value }))}
-                style={{ width: "100%", marginBottom: 10, padding: "6px 8px", background: G.bgHover, border: `1px solid ${G.border}`, color: G.text, borderRadius: 4, fontSize: 13, boxSizing: "border-box" }}
-              />
-              <button
-                style={{ ...css.btn("primary"), width: "100%" }}
-                onClick={() => {
-                  handleAddRegistro(showInfraModal.id);
-                  setShowInfraModal(prev => ({
-                    ...prev,
-                    registros: [...prev.registros, { ...newRegistro }],
-                  }));
-                }}
-              >
-                ➕ Agregar registro
+            <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 14 }}>Tipo: <span style={{ color: T.brownLight, fontWeight: 600 }}>{showInfraModal.tipo}</span></div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: "0.07em", marginBottom: 8 }}>HISTORIAL DE ARREGLOS</div>
+            {showInfraModal.registros.length === 0
+              ? <div style={{ fontSize: 12, color: T.textDim, fontStyle: "italic", marginBottom: 12 }}>Sin registros aún</div>
+              : showInfraModal.registros.map((r, i) => (
+                <div key={i} style={{ fontSize: 12, padding: "7px 10px", background: T.bgHover, borderRadius: 6, marginBottom: 4, borderLeft: "3px solid " + T.brownLight, color: T.text }}>
+                  <span style={{ color: T.brownLight, fontWeight: 600 }}>{r.fecha}</span> — {r.desc}
+                </div>
+              ))
+            }
+            <div style={{ borderTop: "1px solid " + T.border, paddingTop: 14, marginTop: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: "0.07em", marginBottom: 8 }}>AGREGAR REGISTRO</div>
+              <input type="date" value={newRegistro.fecha} onChange={e => setNewRegistro(r => ({ ...r, fecha: e.target.value }))} style={{ ...inp, marginBottom: 8 }} />
+              <input placeholder="Descripción..." value={newRegistro.desc} onChange={e => setNewRegistro(r => ({ ...r, desc: e.target.value }))} style={{ ...inp, marginBottom: 12 }} />
+              <button onClick={() => handleAddRegistro(showInfraModal.id)}
+                style={{ width: "100%", padding: "8px 0", borderRadius: 6, border: "none", background: T.teal, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
+                Agregar registro
               </button>
             </div>
-
-            <button style={{ ...css.btn("secondary"), width: "100%", marginTop: 10 }} onClick={() => setShowInfraModal(null)}>
+            <button onClick={() => setShowInfraModal(null)} style={{ width: "100%", marginTop: 10, padding: "8px 0", borderRadius: 6, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
               Cerrar
             </button>
           </div>
         </div>
       )}
 
-      {/* Historial parcela seleccionada */}
-      {parcelaSeleccionada && parcelaData && (
-        <div style={{ ...css.card, marginTop: 20 }}>
+      {/* Historial parcela */}
+      {parcelaSelected && parcelaData && (
+        <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10, padding: 20, marginTop: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: G.cream }}>
-              Historial — <span style={{ color: G.goldLight }}>{parcelaSeleccionada}</span>
+            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: T.cream, fontWeight: 700 }}>
+              Historial — <span style={{ color: T.brownLight }}>{parcelaSelected}</span>
             </div>
-            <div style={css.badge(parcelaData.animales > 0 ? (parcelaData.tipo === "arrendamiento" ? "blue" : "green") : "gold")}>
+            <div style={{ padding: "3px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: "0.06em",
+              background: parcelaData.animales > 0 ? (parcelaData.tipo === "arrendamiento" ? T.teal + "22" : T.green + "22") : T.bgHover,
+              color: parcelaData.animales > 0 ? (parcelaData.tipo === "arrendamiento" ? T.tealLight : T.greenLight) : T.textMuted,
+              border: "1px solid " + (parcelaData.animales > 0 ? (parcelaData.tipo === "arrendamiento" ? T.teal : T.green) : T.border) }}>
               {parcelaData.animales > 0 ? parcelaData.estado.toUpperCase() : "DESCANSO"}
             </div>
           </div>
-
-          {/* Stats rápidas */}
-          <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
             {[
-              { label: "Animales actuales", value: parcelaData.animales || "—" },
-              { label: "Estado actual", value: parcelaData.estado },
-              { label: "Días en estado", value: `${parcelaData.diasEstado}d` },
-              { label: "Tropa", value: parcelaData.tropa || "—" },
+              { label: "Animales", value: parcelaData.animales || "—" },
+              { label: "Estado",   value: parcelaData.estado },
+              { label: "Días",     value: parcelaData.diasEstado + "d" },
+              { label: "Tropa",    value: parcelaData.tropa || "—" },
             ].map(s => (
-              <div key={s.label} style={{ background: G.bgHover, border: `1px solid ${G.border}`, borderRadius: 6, padding: "10px 14px", minWidth: 100 }}>
-                <div style={{ fontSize: 11, color: G.textMuted, marginBottom: 4 }}>{s.label}</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: G.cream }}>{s.value}</div>
+              <div key={s.label} style={{ background: T.bgHover, border: "1px solid " + T.border, borderRadius: 8, padding: "10px 16px", minWidth: 90 }}>
+                <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>{s.label}</div>
+                <div style={{ fontSize: 17, fontWeight: 700, color: T.text, fontFamily: "'Outfit', sans-serif" }}>{s.value}</div>
               </div>
             ))}
           </div>
-
-          {/* Tabla historial */}
-          <div style={{ fontSize: 12, color: G.textMuted, fontWeight: 700, letterSpacing: "0.05em", marginBottom: 8 }}>
-            MOVIMIENTOS
-          </div>
-          <div>
-            {historial.map((h, i) => (
-              <div key={i} style={{
-                display: "flex", gap: 16, padding: "8px 12px",
-                background: i % 2 === 0 ? G.bgHover : "transparent",
-                borderRadius: 4, fontSize: 13,
-              }}>
-                <span style={{ color: G.gold, minWidth: 90 }}>{h.fecha}</span>
-                <span style={{ color: G.text, flex: 1 }}>{h.evento}</span>
-                {h.animales > 0 && <span style={{ color: G.greenLight }}>{h.animales} cab.</span>}
-              </div>
-            ))}
-          </div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: "0.07em", marginBottom: 8 }}>MOVIMIENTOS</div>
+          {[
+            { fecha: "2024-10-01", evento: "Ingreso tropa T-2024-06", animales: 57 },
+            { fecha: "2024-09-15", evento: "Salida hacia P7.2",        animales: 57 },
+            { fecha: "2024-08-20", evento: "Ingreso tropa T-2024-05",  animales: 60 },
+            { fecha: "2024-08-01", evento: "Inicio descanso",          animales: 0  },
+          ].map((h, i) => (
+            <div key={i} style={{ display: "flex", gap: 16, padding: "8px 12px", borderRadius: 6, background: i % 2 === 0 ? T.bgHover : "transparent", fontSize: 13 }}>
+              <span style={{ color: T.brownLight, minWidth: 90, fontWeight: 600 }}>{h.fecha}</span>
+              <span style={{ color: T.text, flex: 1 }}>{h.evento}</span>
+              {h.animales > 0 && <span style={{ color: T.teal, fontWeight: 600 }}>{h.animales} cab.</span>}
+            </div>
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-// ─── PLACEHOLDER TABS ─────────────────────────────────────────────────────────
-function PlaceholderTab({ label }) {
+function Placeholder({ label, T }) {
   return (
-    <div style={{ ...css.card, textAlign: "center", padding: 60 }}>
-      <div style={{ fontSize: 40, marginBottom: 16 }}>🚧</div>
-      <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: G.cream, marginBottom: 8 }}>
-        {label}
-      </div>
-      <div style={{ color: G.textMuted, fontSize: 14 }}>Esta sección está en desarrollo</div>
+    <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10, padding: 60, textAlign: "center" }}>
+      <div style={{ fontSize: 28, color: T.borderLight, marginBottom: 14 }}>◌</div>
+      <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: T.cream, marginBottom: 8 }}>{label}</div>
+      <div style={{ color: T.textMuted, fontSize: 14 }}>Esta sección está en desarrollo</div>
     </div>
   );
 }
 
-// ─── APP PRINCIPAL ────────────────────────────────────────────────────────────
 export default function App() {
-  const [tab, setTab] = useState("campo");
-  const [parcelas, setParcelas] = useState(initialParcelas);
-  const [infraestructura, setInfraestructura] = useState(initialInfraestructura);
-
-  const renderTab = () => {
-    switch (tab) {
-      case "campo":
-        return (
-          <>
-            <div style={css.pageTitle}>Mapa del Campo</div>
-            <div style={css.pageSubtitle}>Vista general de potreros, parcelas e infraestructura</div>
-            <MapaCampo
-              parcelas={parcelas}
-              setParcelas={setParcelas}
-              infraestructura={infraestructura}
-              setInfraestructura={setInfraestructura}
-            />
-          </>
-        );
-      default:
-        return <PlaceholderTab label={TABS.find(t => t.id === tab)?.label || tab} />;
-    }
-  };
+  const [themeKey, setThemeKey]   = useState("dark");
+  const [tab, setTab]             = useState("campo");
+  const [sidebarOpen, setSidebar] = useState(true);
+  const [parcelas, setParcelas]   = useState(initialParcelas);
+  const [infra, setInfra]         = useState(initialInfra);
+  const T = THEMES[themeKey];
 
   return (
     <>
-      {/* Google Fonts */}
-      <link
-        href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400&display=swap"
-        rel="stylesheet"
-      />
-      <div style={css.app}>
-        {/* NAV */}
-        <nav style={css.nav}>
-          <div style={css.navBrand}>🐄 Campo</div>
-          {TABS.map(t => (
-            <div
-              key={t.id}
-              style={css.navTab(tab === t.id)}
-              onClick={() => setTab(t.id)}
-            >
-              {t.label}
-            </div>
-          ))}
-        </nav>
+      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet" />
+      <div style={{ minHeight: "100vh", background: T.bg, color: T.text, fontFamily: "'Outfit', sans-serif", display: "flex", transition: "background 0.3s" }}>
 
-        {/* MAIN */}
-        <main style={css.main}>
-          {renderTab()}
-        </main>
+        {/* SIDEBAR */}
+        <aside style={{ width: sidebarOpen ? 220 : 58, flexShrink: 0, background: T.bgSidebar, borderRight: "1px solid " + T.border, display: "flex", flexDirection: "column", transition: "width 0.22s ease", overflow: "hidden" }}>
+
+          {/* Logo */}
+          <div style={{ padding: "18px 14px", borderBottom: "1px solid " + T.border, display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: T.brown, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 15 }}>C</div>
+            {sidebarOpen && (
+              <div>
+                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 14, color: T.cream, fontWeight: 700, lineHeight: 1.15 }}>Los Cachorros</div>
+                <div style={{ fontSize: 11, color: T.textMuted }}>Campo ganadero</div>
+              </div>
+            )}
+          </div>
+
+          {/* Nav */}
+          <nav style={{ flex: 1, padding: "10px 6px", display: "flex", flexDirection: "column", gap: 1 }}>
+            {NAV_ITEMS.map(item => {
+              const active = tab === item.id;
+              return (
+                <div key={item.id} onClick={() => setTab(item.id)} title={!sidebarOpen ? item.label : ""}
+                  style={{ display: "flex", alignItems: "center", gap: 10,
+                    padding: sidebarOpen ? "9px 10px" : "9px 0", justifyContent: sidebarOpen ? "flex-start" : "center",
+                    borderRadius: 7, cursor: "pointer", transition: "all 0.12s",
+                    background: active ? T.activeNavBg : "transparent",
+                    color: active ? T.activeNavColor : T.textMuted,
+                    borderLeft: active ? "3px solid " + T.activeNavBorder : "3px solid transparent",
+                  }}>
+                  <span style={{ fontSize: 13, flexShrink: 0 }}>{item.icon}</span>
+                  {sidebarOpen && <span style={{ fontSize: 13, fontWeight: active ? 600 : 400, whiteSpace: "nowrap" }}>{item.label}</span>}
+                </div>
+              );
+            })}
+          </nav>
+
+          {/* Bottom */}
+          <div style={{ padding: "10px 6px", borderTop: "1px solid " + T.border, display: "flex", flexDirection: "column", gap: 2 }}>
+            <div onClick={() => setThemeKey(k => k === "dark" ? "light" : "dark")} title={!sidebarOpen ? "Cambiar tema" : ""}
+              style={{ display: "flex", alignItems: "center", gap: 10, padding: sidebarOpen ? "8px 10px" : "8px 0", justifyContent: sidebarOpen ? "flex-start" : "center", borderRadius: 7, cursor: "pointer", color: T.textMuted }}>
+              <span style={{ fontSize: 13 }}>{themeKey === "dark" ? "○" : "●"}</span>
+              {sidebarOpen && <span style={{ fontSize: 13 }}>{themeKey === "dark" ? "Tema claro" : "Tema oscuro"}</span>}
+            </div>
+            <div onClick={() => setSidebar(o => !o)}
+              style={{ display: "flex", alignItems: "center", gap: 10, padding: sidebarOpen ? "8px 10px" : "8px 0", justifyContent: sidebarOpen ? "flex-start" : "center", borderRadius: 7, cursor: "pointer", color: T.textDim }}>
+              <span style={{ fontSize: 13 }}>{sidebarOpen ? "◁" : "▷"}</span>
+              {sidebarOpen && <span style={{ fontSize: 13 }}>Contraer</span>}
+            </div>
+          </div>
+        </aside>
+
+        {/* CONTENT */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+
+          {/* Header */}
+          <header style={{ padding: "14px 28px", borderBottom: "1px solid " + T.border, background: T.bgCard, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: T.cream, fontWeight: 700 }}>
+                {NAV_ITEMS.find(n => n.id === tab)?.label}
+              </div>
+              <div style={{ fontSize: 12, color: T.textMuted, marginTop: 1 }}>
+                {new Date().toLocaleDateString("es-AR", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ padding: "5px 14px", borderRadius: 20, background: T.teal + "18", border: "1px solid " + T.teal, fontSize: 12, color: T.tealLight, fontWeight: 600 }}>
+                345 cab. totales
+              </div>
+              <div style={{ padding: "5px 14px", borderRadius: 20, background: T.brown + "18", border: "1px solid " + T.brown, fontSize: 12, color: T.brownLight, fontWeight: 600 }}>
+                176 arrendadas
+              </div>
+            </div>
+          </header>
+
+          {/* Main */}
+          <main style={{ flex: 1, padding: 24, overflowY: "auto" }}>
+            {tab === "campo"
+              ? <MapaCampo parcelas={parcelas} setParcelas={setParcelas} infra={infra} setInfra={setInfra} T={T} />
+              : <Placeholder label={NAV_ITEMS.find(n => n.id === tab)?.label} T={T} />
+            }
+          </main>
+        </div>
       </div>
     </>
   );
