@@ -678,6 +678,344 @@ function ParcelaPanel({ parcelaId, parcelaData, parcelas, T, onClose }) {
   );
 }
 
+// ─── ARRENDAMIENTO ───────────────────────────────────────────────────────────
+function Arrendamiento({ T, parcelas }) {
+  const [lotes, setLotes]           = useState([]);
+  const [showForm, setShowForm]     = useState(false);
+  const [showAsignar, setShowAsignar] = useState(null);
+  const [showDetalle, setShowDetalle] = useState(null);
+  const [loading, setLoading]       = useState(false);
+  const [asignarForm, setAsignarForm] = useState({ parcela: "", cantidad: 0 });
+  const [form, setForm] = useState({
+    lote: "", fecha: new Date().toISOString().split("T")[0],
+    productor: "", cabezas: "", sexo: "macho",
+    pesoPromedio: "", observaciones: "",
+  });
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "arrendamiento"), snap => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      data.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+      setLotes(data);
+    });
+    return () => unsub();
+  }, []);
+
+  // Calcula meses calendario completos desde fecha de ingreso
+  const calcMeses = (fechaIngreso) => {
+    if (!fechaIngreso) return 0;
+    const ingreso = new Date(fechaIngreso);
+    const hoy = new Date();
+    // Primer mes completo = mes siguiente al ingreso
+    const inicioComputo = new Date(ingreso.getFullYear(), ingreso.getMonth() + 1, 1);
+    if (hoy < inicioComputo) return 0;
+    const meses = (hoy.getFullYear() - inicioComputo.getFullYear()) * 12 +
+      (hoy.getMonth() - inicioComputo.getMonth()) + 1;
+    return Math.max(0, meses);
+  };
+
+  const calcKgAcumulados = (lote) => {
+    const meses = calcMeses(lote.fecha);
+    return meses * 8 * (lote.cabezas || 0);
+  };
+
+  // Desglose mes a mes
+  const desgloseMeses = (lote) => {
+    if (!lote.fecha) return [];
+    const ingreso = new Date(lote.fecha);
+    const hoy = new Date();
+    const meses = [];
+    let cursor = new Date(ingreso.getFullYear(), ingreso.getMonth() + 1, 1);
+    while (cursor <= hoy) {
+      meses.push({
+        label: cursor.toLocaleDateString("es-AR", { month: "long", year: "numeric" }),
+        kg: 8 * (lote.cabezas || 0),
+        acumulado: (meses.length + 1) * 8 * (lote.cabezas || 0),
+      });
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+    }
+    return meses;
+  };
+
+  const totalKgAcumulados = lotes.reduce((s, l) => s + calcKgAcumulados(l), 0);
+  const totalCabezas = lotes.reduce((s, l) => s + (parseInt(l.cabezas) || 0), 0);
+  const totalMesesPromedio = lotes.length > 0
+    ? Math.round(lotes.reduce((s, l) => s + calcMeses(l.fecha), 0) / lotes.length)
+    : 0;
+
+  const handleGuardar = async () => {
+    if (!form.lote || !form.cabezas || !form.productor) return;
+    setLoading(true);
+    try {
+      await addDoc(collection(db, "arrendamiento"), {
+        ...form,
+        cabezas: parseInt(form.cabezas),
+        pesoPromedio: parseFloat(form.pesoPromedio) || 0,
+        stockRestante: parseInt(form.cabezas),
+        creadoEn: new Date().toISOString().split("T")[0],
+      });
+      setShowForm(false);
+      setForm({ lote: "", fecha: new Date().toISOString().split("T")[0], productor: "", cabezas: "", sexo: "macho", pesoPromedio: "", observaciones: "" });
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  const handleAsignar = async () => {
+    const cant = parseInt(asignarForm.cantidad);
+    if (!asignarForm.parcela || !cant || cant <= 0) return;
+    setLoading(true);
+    try {
+      const parcelaData = parcelas[asignarForm.parcela] || {};
+      await setDoc(doc(db, "parcelas", asignarForm.parcela), {
+        animales:     (parcelaData.animales || 0) + cant,
+        estado:       "pastoreo",
+        fechaIngreso: new Date().toISOString().split("T")[0],
+        fechaDescanso: null,
+        tropa:        showAsignar.lote,
+        tipo:         "arrendamiento",
+      });
+      await updateDoc(doc(db, "arrendamiento", showAsignar.id), {
+        stockRestante: (showAsignar.stockRestante || showAsignar.cabezas) - cant,
+      });
+      await addDoc(collection(db, "movimientos"), {
+        fecha:        new Date().toISOString().split("T")[0],
+        origen:       "arr-" + showAsignar.lote,
+        destino:      asignarForm.parcela,
+        cantidad:     cant,
+        kgPromedio:   showAsignar.pesoPromedio,
+        observaciones: "Ingreso arrendamiento lote " + showAsignar.lote,
+        tropa:        showAsignar.lote,
+        tipo:         "arrendamiento",
+        creadoEn:     new Date().toISOString().split("T")[0],
+      });
+      setShowAsignar(null);
+      setAsignarForm({ parcela: "", cantidad: 0 });
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  const fmt = (n) => n ? new Intl.NumberFormat("es-AR").format(Math.round(n)) : "0";
+
+  const inp = {
+    width: "100%", padding: "10px 12px", borderRadius: 6, fontSize: 14,
+    background: T.bgInput, border: "1px solid " + T.border,
+    color: T.text, boxSizing: "border-box", outline: "none", fontFamily: "'Outfit', sans-serif",
+  };
+
+  const CARD = { background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10, padding: "18px 22px" };
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+        <div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 26, color: T.cream, fontWeight: 700 }}>Arrendamiento</div>
+          <div style={{ fontSize: 14, color: T.textMuted, marginTop: 2 }}>Hacienda de terceros — cobro de 8 kg/animal/mes</div>
+        </div>
+        <button onClick={() => setShowForm(v => !v)}
+          style={{ padding: "10px 24px", borderRadius: 7, border: "none", background: T.teal, color: "#fff", cursor: "pointer", fontSize: 15, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
+          {showForm ? "Cancelar" : "+ Nuevo lote"}
+        </button>
+      </div>
+
+      {/* Dashboard KG acumulados */}
+      {lotes.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+          {[
+            { label: "Cabezas arrendadas",  value: totalCabezas,       unit: "cab.",     color: T.tealLight },
+            { label: "Meses promedio",       value: totalMesesPromedio, unit: "meses",    color: T.text },
+            { label: "Kg totales acumulados",value: fmt(totalKgAcumulados), unit: "kg",  color: T.greenLight },
+            { label: "Lotes activos",        value: lotes.filter(l => (l.stockRestante || 0) > 0).length, unit: "lotes", color: T.brownLight },
+          ].map(s => (
+            <div key={s.label} style={{ ...CARD }}>
+              <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 6 }}>{s.label}</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: s.color, lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>{s.value}</div>
+              <div style={{ fontSize: 12, color: T.textMuted, marginTop: 3 }}>{s.unit}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Formulario */}
+      {showForm && (
+        <div style={{ ...CARD, border: "1px solid " + T.teal, marginBottom: 24 }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 19, color: T.tealLight, marginBottom: 18, fontWeight: 700 }}>
+            Nuevo lote de arrendamiento
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Número de lote</div>
+              <input placeholder="Ej: A-2025-01" value={form.lote} onChange={e => setForm(f => ({ ...f, lote: e.target.value }))} style={inp} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Fecha de ingreso</div>
+              <input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} style={inp} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Productor</div>
+              <input placeholder="Nombre del productor" value={form.productor} onChange={e => setForm(f => ({ ...f, productor: e.target.value }))} style={inp} />
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Cantidad de cabezas</div>
+              <input type="number" placeholder="Ej: 80" value={form.cabezas} onChange={e => setForm(f => ({ ...f, cabezas: e.target.value }))} style={inp} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Sexo</div>
+              <select value={form.sexo} onChange={e => setForm(f => ({ ...f, sexo: e.target.value }))} style={inp}>
+                <option value="macho">Macho</option>
+                <option value="hembra">Hembra</option>
+                <option value="mixto">Mixto</option>
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Peso promedio ingreso (kg)</div>
+              <input type="number" placeholder="Ej: 200" value={form.pesoPromedio} onChange={e => setForm(f => ({ ...f, pesoPromedio: e.target.value }))} style={inp} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Observaciones</div>
+            <input placeholder="Notas adicionales..." value={form.observaciones} onChange={e => setForm(f => ({ ...f, observaciones: e.target.value }))} style={inp} />
+          </div>
+          <button onClick={handleGuardar} disabled={loading || !form.lote || !form.cabezas || !form.productor}
+            style={{ padding: "10px 28px", borderRadius: 7, border: "none", background: T.teal, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif", opacity: loading ? 0.7 : 1 }}>
+            {loading ? "Guardando..." : "Guardar lote"}
+          </button>
+        </div>
+      )}
+
+      {/* Lista de lotes */}
+      {lotes.length === 0 ? (
+        <div style={{ ...CARD, textAlign: "center", padding: 60 }}>
+          <div style={{ fontSize: 28, color: T.borderLight, marginBottom: 14 }}>◇</div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, color: T.cream, marginBottom: 8, fontWeight: 700 }}>Sin lotes registrados</div>
+          <div style={{ color: T.textMuted, fontSize: 14 }}>Agregá el primer lote de arrendamiento</div>
+        </div>
+      ) : (
+        lotes.map(lote => {
+          const meses = calcMeses(lote.fecha);
+          const kgAcum = calcKgAcumulados(lote);
+          const desglose = desgloseMeses(lote);
+          const expanded = showDetalle === lote.id;
+          return (
+            <div key={lote.id} style={{ ...CARD, marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 19, color: T.cream, fontWeight: 700 }}>
+                      Lote {lote.lote}
+                    </div>
+                    <div style={{ padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
+                      background: T.teal + "22", color: T.tealLight, border: "1px solid " + T.teal }}>
+                      {lote.sexo}
+                    </div>
+                    {(lote.stockRestante || 0) === 0 && (
+                      <div style={{ padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
+                        background: T.bgHover, color: T.textDim, border: "1px solid " + T.border }}>
+                        Retirado
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 13, color: T.textMuted }}>
+                    {lote.productor} · {lote.fecha} · {lote.cabezas} cab. · {lote.pesoPromedio} kg/cab
+                  </div>
+                </div>
+
+                {/* KG acumulados */}
+                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 11, color: T.textMuted }}>Kg acumulados ({meses} meses)</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: T.greenLight }}>{fmt(kgAcum)} kg</div>
+                    <div style={{ fontSize: 11, color: T.textMuted }}>{fmt(meses * 8)} kg/cab × {lote.cabezas} cab.</div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {(lote.stockRestante || lote.cabezas) > 0 && (
+                      <button onClick={() => { setShowAsignar(lote); setAsignarForm({ parcela: "", cantidad: lote.stockRestante || lote.cabezas }); }}
+                        style={{ padding: "7px 14px", borderRadius: 6, border: "none", background: T.teal, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
+                        Asignar parcela
+                      </button>
+                    )}
+                    <button onClick={() => setShowDetalle(expanded ? null : lote.id)}
+                      style={{ padding: "7px 14px", borderRadius: 6, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
+                      {expanded ? "Ocultar" : "Ver desglose"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Desglose mensual */}
+              {expanded && (
+                <div style={{ marginTop: 16, borderTop: "1px solid " + T.border, paddingTop: 14 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, letterSpacing: "0.06em", marginBottom: 10 }}>DESGLOSE MENSUAL — 8 kg × {lote.cabezas} cab.</div>
+                  {desglose.length === 0 ? (
+                    <div style={{ fontSize: 13, color: T.textDim, fontStyle: "italic" }}>Aún no hay meses completos desde el ingreso</div>
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
+                      {desglose.map((m, i) => (
+                        <div key={i} style={{ background: T.bgHover, border: "1px solid " + T.border, borderRadius: 8, padding: "10px 14px" }}>
+                          <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 4, textTransform: "capitalize" }}>{m.label}</div>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: T.greenLight }}>{fmt(m.kg)} kg</div>
+                          <div style={{ fontSize: 11, color: T.textDim, marginTop: 2 }}>Acum: {fmt(m.acumulado)} kg</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
+
+      {/* Modal asignar parcela */}
+      {showAsignar && (
+        <div onClick={() => setShowAsignar(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: T.bgCard, border: "1px solid " + T.teal, borderRadius: 12, padding: 24, minWidth: 340, maxWidth: 440, width: "90%", boxShadow: "0 8px 40px rgba(0,0,0,0.5)" }}>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, color: T.cream, fontWeight: 700, marginBottom: 6 }}>
+              Asignar lote {showAsignar.lote}
+            </div>
+            <div style={{ fontSize: 13, color: T.textMuted, marginBottom: 18 }}>
+              {showAsignar.productor} · <b style={{ color: T.tealLight }}>{showAsignar.stockRestante || showAsignar.cabezas} cabezas disponibles</b>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Parcela destino</div>
+              <select value={asignarForm.parcela} onChange={e => setAsignarForm(f => ({ ...f, parcela: e.target.value }))}
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 6, fontSize: 14, background: T.bgInput, border: "1px solid " + T.border, color: T.text, fontFamily: "'Outfit', sans-serif" }}>
+                <option value="">— Seleccionar parcela —</option>
+                {Object.keys({ ...PARCELAS_DEFAULT, ...parcelas }).sort().map(k => {
+                  const d = parcelas[k];
+                  return (
+                    <option key={k} value={k}>
+                      {k} {d?.animales > 0 ? "⚠ pastoreando (" + d.animales + " cab.)" : "(vacía)"}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Cantidad a asignar</div>
+              <input type="number" min={1} max={showAsignar.stockRestante || showAsignar.cabezas} value={asignarForm.cantidad}
+                onChange={e => setAsignarForm(f => ({ ...f, cantidad: e.target.value }))}
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 6, fontSize: 14, background: T.bgInput, border: "1px solid " + T.border, color: T.text, boxSizing: "border-box", fontFamily: "'Outfit', sans-serif" }} />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={handleAsignar} disabled={loading || !asignarForm.parcela || !asignarForm.cantidad}
+                style={{ flex: 1, padding: "10px 0", borderRadius: 7, border: "none", background: T.teal, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
+                {loading ? "Asignando..." : "Confirmar"}
+              </button>
+              <button onClick={() => setShowAsignar(null)}
+                style={{ padding: "10px 16px", borderRadius: 7, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 14, fontFamily: "'Outfit', sans-serif" }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── STOCK ────────────────────────────────────────────────────────────────────
 function Stock({ T }) {
   const [compras, setCompras] = useState([]);
@@ -1430,7 +1768,8 @@ export default function App() {
             {tab === "campo"   && <MapaCampo parcelas={parcelas} infra={infra} T={T} />}
             {tab === "stock"   && <Stock T={T} />}
             {tab === "compras" && <Compras T={T} parcelas={parcelas} />}
-            {tab !== "campo" && tab !== "stock" && tab !== "compras" && <Placeholder label={NAV_ITEMS.find(n => n.id === tab)?.label} T={T} />}
+            {tab !== "campo" && tab !== "stock" && tab !== "compras" && tab !== "arrendamiento" && <Placeholder label={NAV_ITEMS.find(n => n.id === tab)?.label} T={T} />}
+            {tab === "arrendamiento" && <Arrendamiento T={T} parcelas={parcelas} />}
           </main>
         </div>
       </div>
