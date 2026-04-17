@@ -93,6 +93,24 @@ const PARCELAS_DEFAULT = {
 
 const INFRA_ICONS = { casa: "⌂", molino: "⊛", tanque: "◉", bebida: "◎", manga: "⊞", otro: "◆" };
 
+const calcDias = (parcela) => {
+  if (!parcela) return 0;
+  // Con animales → días pastoreando desde fechaIngreso
+  if (parcela.animales > 0) {
+    if (!parcela.fechaIngreso) return parcela.diasEstado || 0;
+    const ingreso = new Date(parcela.fechaIngreso);
+    const hoy = new Date();
+    return Math.floor((hoy - ingreso) / (1000 * 60 * 60 * 24));
+  }
+  // Sin animales → días de descanso desde fechaDescanso
+  if (parcela.fechaDescanso) {
+    const descanso = new Date(parcela.fechaDescanso);
+    const hoy = new Date();
+    return Math.floor((hoy - descanso) / (1000 * 60 * 60 * 24));
+  }
+  return 0;
+};
+
 function MapaCampo({ parcelas, infra, T }) {
   const [modoEdicion, setModoEdicion]         = useState(false);
   const [parcelaSelected, setParcelaSelected] = useState(null);
@@ -281,11 +299,11 @@ function MapaCampo({ parcelas, infra, T }) {
                         <>
                           <div style={{ fontSize: 26, fontWeight: 800, color: col.text, lineHeight: 1 }}>{data.animales}</div>
                           <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2 }}>cabezas</div>
-                          <div style={{ fontSize: 11, color: T.brownLight, marginTop: 3, fontWeight: 600 }}>{data.diasEstado}d pastoreo</div>
+                          <div style={{ fontSize: 11, color: T.brownLight, marginTop: 3, fontWeight: 600 }}>{calcDias(data)}d pastoreo</div>
                         </>
                       ) : !modoEdicion ? (
                         <div style={{ fontSize: 10, color: T.textDim, fontStyle: "italic" }}>
-                          {data && data.diasEstado > 0 ? data.diasEstado + "d desc." : "Vacío"}
+                          {data && calcDias(data) > 0 ? calcDias(data) + "d desc." : "Vacío"}
                         </div>
                       ) : null}
 
@@ -298,7 +316,7 @@ function MapaCampo({ parcelas, infra, T }) {
                           <div style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.8 }}>
                             <div>Animales: <b style={{ color: T.text }}>{data.animales || "—"}</b></div>
                             <div>Estado: <b style={{ color: data.estado === "pastoreo" ? T.green : T.brownLight }}>{data.estado}</b></div>
-                            <div>Días: <b style={{ color: T.text }}>{data.diasEstado}</b></div>
+                            <div>Días: <b style={{ color: T.text }}>{calcDias(data)}</b></div>
                             {data.tropa && <div>Tropa: <b style={{ color: T.brownLight }}>{data.tropa}</b></div>}
                             {data.tipo && <div>Uso: <b style={{ color: data.tipo === "arrendamiento" ? T.teal : T.green }}>{data.tipo}</b></div>}
                           </div>
@@ -501,27 +519,30 @@ function ParcelaPanel({ parcelaId, parcelaData, parcelas, T, onClose }) {
         cantidad:       cant,
         kgPromedio:     rotForm.kgPromedio ? parseFloat(rotForm.kgPromedio) : null,
         observaciones:  rotForm.observaciones,
-        diasEnOrigen:   parcelaData.diasEstado,
+        diasEnOrigen: calcDias(parcelaData),
         tropa:          parcelaData.tropa || null,
         creadoEn:       hoy,
       });
 
       // Actualizar parcela origen
       const restantes = parcelaData.animales - cant;
+      const diasActuales = calcDias(parcelaData);
       await setDoc(doc(db, "parcelas", parcelaId), {
         ...parcelaData,
-        animales:   restantes,
-        estado:     restantes > 0 ? "pastoreo" : "descanso",
-        diasEstado: restantes > 0 ? parcelaData.diasEstado : 0,
+        animales:      restantes,
+        estado:        restantes > 0 ? "pastoreo" : "descanso",
+        fechaIngreso:  restantes > 0 ? parcelaData.fechaIngreso : null,
+        fechaDescanso: restantes === 0 ? hoy : null,
+        diasFinal:     restantes === 0 ? diasActuales : null,
       });
 
       // Actualizar parcela destino
       await setDoc(doc(db, "parcelas", rotForm.destino), {
-        animales:   (destData.animales || 0) + cant,
-        estado:     "pastoreo",
-        diasEstado: 0,
-        tropa:      parcelaData.tropa || destData.tropa || null,
-        tipo:       parcelaData.tipo || destData.tipo || null,
+        animales:    (destData.animales || 0) + cant,
+        estado:      "pastoreo",
+        fechaIngreso: hoy,
+        tropa:       parcelaData.tropa || destData.tropa || null,
+        tipo:        parcelaData.tipo || destData.tipo || null,
       });
 
       setShowRotacion(false);
@@ -567,7 +588,7 @@ function ParcelaPanel({ parcelaId, parcelaData, parcelas, T, onClose }) {
         {[
           { label: "Animales",  value: parcelaData.animales || "—" },
           { label: "Estado",    value: parcelaData.estado },
-          { label: "Días",      value: parcelaData.diasEstado + "d" },
+          { label: parcelaData.animales > 0 ? "Días pastoreo" : "Días descanso", value: calcDias(parcelaData) + "d" },
           { label: "Tropa",     value: parcelaData.tropa || "—" },
           { label: "Uso",       value: parcelaData.tipo || "—" },
         ].map(s => (
@@ -922,11 +943,11 @@ function Compras({ T, parcelas }) {
       const parcelaData = parcelas[asignarForm.parcela] || {};
       // Actualizar parcela
       await setDoc(doc(db, "parcelas", asignarForm.parcela), {
-        animales:   (parcelaData.animales || 0) + cant,
-        estado:     "pastoreo",
-        diasEstado: 0,
-        tropa:      showAsignar.tropa,
-        tipo:       parcelaData.tipo || "propio",
+        animales:    (parcelaData.animales || 0) + cant,
+        estado:      "pastoreo",
+        fechaIngreso: new Date().toISOString().split("T")[0],
+        tropa:       showAsignar.tropa,
+        tipo:        parcelaData.tipo || "propio",
       });
       // Actualizar stock de la compra
       await updateDoc(doc(db, "compras", showAsignar.id), {
