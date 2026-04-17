@@ -1195,8 +1195,10 @@ function Arrendamiento({ T, parcelas }) {
                       </div>
                     )}
                   </div>
-                  <div style={{ fontSize: 13, color: T.textMuted }}>
-                    {lote.lote && <span>Lote {lote.lote} · </span>}{lote.fecha} · {lote.cabezas} cab. · {lote.pesoPromedio} kg/cab
+                  <div style={{ fontSize: 13, color: T.textMuted, display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
+                    {lote.lote && <span style={{ color: T.textMuted }}>Lote: <b style={{ color: T.text }}>{lote.lote}</b></span>}
+                    <span>Fecha ingreso: <b style={{ color: T.text }}>{lote.fecha}</b></span>
+                    <span>Cabezas: <b style={{ color: T.text }}>{lote.cabezas}</b></span>
                   </div>
                 </div>
 
