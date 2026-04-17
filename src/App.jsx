@@ -1122,16 +1122,16 @@ function Arrendamiento({ T, parcelas }) {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
             <div>
-              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Número de lote</div>
-              <input placeholder="Ej: A-2025-01" value={form.lote} onChange={e => setForm(f => ({ ...f, lote: e.target.value }))} style={inp} />
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Productor</div>
+              <input placeholder="Nombre del productor" value={form.productor} onChange={e => setForm(f => ({ ...f, productor: e.target.value }))} style={inp} />
             </div>
             <div>
               <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Fecha de ingreso</div>
               <input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} style={inp} />
             </div>
             <div>
-              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Productor</div>
-              <input placeholder="Nombre del productor" value={form.productor} onChange={e => setForm(f => ({ ...f, productor: e.target.value }))} style={inp} />
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Número de lote (opcional)</div>
+              <input placeholder="Ej: A-2025-01" value={form.lote} onChange={e => setForm(f => ({ ...f, lote: e.target.value }))} style={inp} />
             </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
@@ -1156,7 +1156,7 @@ function Arrendamiento({ T, parcelas }) {
             <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Observaciones</div>
             <input placeholder="Notas adicionales..." value={form.observaciones} onChange={e => setForm(f => ({ ...f, observaciones: e.target.value }))} style={inp} />
           </div>
-          <button onClick={handleGuardar} disabled={loading || !form.lote || !form.cabezas || !form.productor}
+          <button onClick={handleGuardar} disabled={loading || !form.cabezas || !form.productor}
             style={{ padding: "10px 28px", borderRadius: 7, border: "none", background: T.teal, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif", opacity: loading ? 0.7 : 1 }}>
             {loading ? "Guardando..." : "Guardar lote"}
           </button>
@@ -1181,8 +1181,8 @@ function Arrendamiento({ T, parcelas }) {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 19, color: T.cream, fontWeight: 700 }}>
-                      Lote {lote.lote}
+                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, color: T.cream, fontWeight: 700 }}>
+                      {lote.productor}
                     </div>
                     <div style={{ padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
                       background: T.teal + "22", color: T.tealLight, border: "1px solid " + T.teal }}>
@@ -1196,7 +1196,7 @@ function Arrendamiento({ T, parcelas }) {
                     )}
                   </div>
                   <div style={{ fontSize: 13, color: T.textMuted }}>
-                    {lote.productor} · {lote.fecha} · {lote.cabezas} cab. · {lote.pesoPromedio} kg/cab
+                    {lote.lote && <span>Lote {lote.lote} · </span>}{lote.fecha} · {lote.cabezas} cab. · {lote.pesoPromedio} kg/cab
                   </div>
                 </div>
 
@@ -1251,10 +1251,10 @@ function Arrendamiento({ T, parcelas }) {
         <div onClick={() => setShowAsignar(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: T.bgCard, border: "1px solid " + T.teal, borderRadius: 12, padding: 24, minWidth: 340, maxWidth: 440, width: "90%", boxShadow: "0 8px 40px rgba(0,0,0,0.5)" }}>
             <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, color: T.cream, fontWeight: 700, marginBottom: 6 }}>
-              Asignar lote {showAsignar.lote}
+              Asignar — {showAsignar.productor}
             </div>
             <div style={{ fontSize: 13, color: T.textMuted, marginBottom: 18 }}>
-              {showAsignar.productor} · <b style={{ color: T.tealLight }}>{showAsignar.stockRestante || showAsignar.cabezas} cabezas disponibles</b>
+              {showAsignar.lote && <span>Lote {showAsignar.lote} · </span>}<b style={{ color: T.tealLight }}>{showAsignar.stockRestante || showAsignar.cabezas} cabezas disponibles</b>
             </div>
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Parcela destino</div>
