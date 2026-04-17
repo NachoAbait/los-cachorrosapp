@@ -678,6 +678,283 @@ function ParcelaPanel({ parcelaId, parcelaData, parcelas, T, onClose }) {
   );
 }
 
+// ─── LLUVIAS ─────────────────────────────────────────────────────────────────
+function Lluvias({ T }) {
+  const hoyDate = new Date();
+  const [mesVista, setMesVista]     = useState(hoyDate.getMonth());
+  const [anioVista, setAnioVista]   = useState(hoyDate.getFullYear());
+  const [anioGrafico, setAnioGrafico] = useState(hoyDate.getFullYear());
+  const [registros, setRegistros]   = useState({});
+  const [editando, setEditando]     = useState(null); // { fecha, mm }
+  const [mmInput, setMmInput]       = useState("");
+  const [loading, setLoading]       = useState(false);
+
+  const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  const DIAS_SEMANA = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+  const ESTACIONES = {
+    "Verano":   [11, 0, 1],
+    "Otoño":    [2, 3, 4],
+    "Invierno": [5, 6, 7],
+    "Primavera":[8, 9, 10],
+  };
+  const ESTACION_COLORS = {
+    "Verano": "#e8a44a", "Otoño": "#c87a3a", "Invierno": "#4a7ec8", "Primavera": "#4e9e43"
+  };
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "lluvias"), snap => {
+      const data = {};
+      snap.docs.forEach(d => { data[d.id] = { id: d.id, ...d.data() }; });
+      setRegistros(data);
+    });
+    return () => unsub();
+  }, []);
+
+  const getFecha = (anio, mes, dia) =>
+    `${anio}-${String(mes + 1).padStart(2,"0")}-${String(dia).padStart(2,"0")}`;
+
+  const handleGuardar = async (fecha) => {
+    const mm = parseFloat(mmInput);
+    if (isNaN(mm) || mm < 0) return;
+    setLoading(true);
+    try {
+      const [anio, mes] = fecha.split("-").map(Number);
+      await setDoc(doc(db, "lluvias", fecha), {
+        fecha, mm, anio, mes: mes - 1,
+        creadoEn: new Date().toISOString().split("T")[0],
+      });
+      setEditando(null);
+      setMmInput("");
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  const handleEliminar = async (fecha) => {
+    setLoading(true);
+    try {
+      await deleteDoc(doc(db, "lluvias", fecha));
+      setEditando(null);
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  // Días del mes
+  const diasEnMes = new Date(anioVista, mesVista + 1, 0).getDate();
+  const primerDia = new Date(anioVista, mesVista, 1).getDay();
+
+  // Stats año seleccionado para gráficos
+  const registrosAnio = Object.values(registros).filter(r => r.anio === anioGrafico);
+  const mmTotalAnio   = registrosAnio.reduce((s, r) => s + (r.mm || 0), 0);
+  const mmAnioActual  = Object.values(registros).filter(r => r.anio === hoyDate.getFullYear()).reduce((s, r) => s + (r.mm || 0), 0);
+
+  // Por mes para el año del gráfico
+  const mmPorMes = Array.from({ length: 12 }, (_, i) => ({
+    name: MESES[i].slice(0, 3),
+    mm: registrosAnio.filter(r => r.mes === i).reduce((s, r) => s + (r.mm || 0), 0),
+  }));
+
+  // Por estación
+  const mmPorEstacion = Object.entries(ESTACIONES).map(([nombre, meses]) => ({
+    name: nombre,
+    mm: registrosAnio.filter(r => meses.includes(r.mes)).reduce((s, r) => s + (r.mm || 0), 0),
+    color: ESTACION_COLORS[nombre],
+  }));
+
+  // Años disponibles
+  const aniosDisponibles = [...new Set(Object.values(registros).map(r => r.anio))].sort((a,b) => b-a);
+  if (!aniosDisponibles.includes(anioGrafico)) aniosDisponibles.unshift(anioGrafico);
+
+  const tooltipStyle = { background: T.bgCard, border: "1px solid " + T.border, borderRadius: 8, fontSize: 13, color: T.text };
+  const CARD = { background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10, padding: "18px 22px" };
+  const hoy = getFecha(hoyDate.getFullYear(), hoyDate.getMonth(), hoyDate.getDate());
+
+  return (
+    <div>
+      {/* Header con total año actual */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 26, color: T.cream, fontWeight: 700 }}>Lluvias</div>
+          <div style={{ fontSize: 14, color: T.textMuted, marginTop: 2 }}>Registro pluviométrico del campo</div>
+        </div>
+        <div style={{ background: T.bgCard, border: "2px solid " + T.teal, borderRadius: 12, padding: "14px 24px", textAlign: "center" }}>
+          <div style={{ fontSize: 12, color: T.tealLight, fontWeight: 700, letterSpacing: "0.06em", marginBottom: 2 }}>LLUVIA ACUMULADA {hoyDate.getFullYear()}</div>
+          <div style={{ fontSize: 36, fontWeight: 800, color: T.tealLight, lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>{mmAnioActual.toFixed(1)}</div>
+          <div style={{ fontSize: 13, color: T.textMuted, marginTop: 2 }}>mm totales</div>
+        </div>
+      </div>
+
+      {/* CALENDARIO */}
+      <div style={{ ...CARD, marginBottom: 24 }}>
+        {/* Nav mes */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <button onClick={() => {
+            if (mesVista === 0) { setMesVista(11); setAnioVista(a => a - 1); }
+            else setMesVista(m => m - 1);
+          }} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 16 }}>‹</button>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 700, color: T.cream }}>
+            {MESES[mesVista]} {anioVista}
+          </div>
+          <button onClick={() => {
+            if (mesVista === 11) { setMesVista(0); setAnioVista(a => a + 1); }
+            else setMesVista(m => m + 1);
+          }} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 16 }}>›</button>
+        </div>
+
+        {/* Días semana header */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
+          {DIAS_SEMANA.map(d => (
+            <div key={d} style={{ textAlign: "center", fontSize: 12, fontWeight: 700, color: T.textDim, padding: "4px 0", letterSpacing: "0.04em" }}>{d}</div>
+          ))}
+        </div>
+
+        {/* Celdas del calendario */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+          {/* Espacios vacíos antes del primer día */}
+          {Array.from({ length: primerDia }, (_, i) => (
+            <div key={"v" + i} />
+          ))}
+          {/* Días del mes */}
+          {Array.from({ length: diasEnMes }, (_, i) => {
+            const dia = i + 1;
+            const fecha = getFecha(anioVista, mesVista, dia);
+            const reg = registros[fecha];
+            const esHoy = fecha === hoy;
+            const editandoEste = editando === fecha;
+
+            return (
+              <div key={dia}
+                onClick={() => {
+                  if (editandoEste) { setEditando(null); setMmInput(""); }
+                  else { setEditando(fecha); setMmInput(reg ? String(reg.mm) : ""); }
+                }}
+                style={{
+                  borderRadius: 8, padding: "8px 6px", textAlign: "center", cursor: "pointer",
+                  background: editandoEste ? T.teal + "33" : reg ? T.teal + "20" : T.bgHover,
+                  border: esHoy ? "2px solid " + T.teal : editandoEste ? "2px solid " + T.teal : "1px solid " + T.border,
+                  transition: "all 0.12s", minHeight: 56,
+                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
+                }}>
+                <div style={{ fontSize: 13, fontWeight: esHoy ? 700 : 400, color: esHoy ? T.tealLight : T.text }}>{dia}</div>
+                {reg && (
+                  <div style={{ fontSize: 11, fontWeight: 700, color: T.tealLight }}>{reg.mm}mm</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Panel edición */}
+        {editando && (
+          <div style={{ marginTop: 16, padding: "14px 18px", background: T.bgHover, borderRadius: 8, border: "1px solid " + T.teal, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 14, color: T.cream, fontWeight: 600 }}>
+              {editando.split("-").reverse().join("/")}
+            </div>
+            <input
+              type="number" min="0" step="0.1" placeholder="mm de lluvia"
+              value={mmInput} onChange={e => setMmInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleGuardar(editando)}
+              style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid " + T.teal, background: T.bgInput, color: T.text, fontSize: 14, width: 140, fontFamily: "'Outfit', sans-serif", outline: "none" }}
+              autoFocus
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => handleGuardar(editando)} disabled={loading}
+                style={{ padding: "8px 18px", borderRadius: 6, border: "none", background: T.teal, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
+                {registros[editando] ? "Actualizar" : "Guardar"}
+              </button>
+              {registros[editando] && (
+                <button onClick={() => handleEliminar(editando)} disabled={loading}
+                  style={{ padding: "8px 14px", borderRadius: 6, border: "none", background: T.red + "22", color: T.red, cursor: "pointer", fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
+                  Eliminar
+                </button>
+              )}
+              <button onClick={() => { setEditando(null); setMmInput(""); }}
+                style={{ padding: "8px 14px", borderRadius: 6, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
+                Cancelar
+              </button>
+            </div>
+            <div style={{ fontSize: 12, color: T.textMuted, marginLeft: "auto" }}>
+              Total del mes: <b style={{ color: T.tealLight }}>
+                {Object.values(registros).filter(r => r.anio === anioVista && r.mes === mesVista).reduce((s,r) => s + r.mm, 0).toFixed(1)} mm
+              </b>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* GRÁFICOS */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, color: T.cream, fontWeight: 700 }}>Estadísticas</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ fontSize: 13, color: T.textMuted }}>Año:</div>
+          <select value={anioGrafico} onChange={e => setAnioGrafico(parseInt(e.target.value))}
+            style={{ padding: "6px 12px", borderRadius: 6, background: T.bgCard, border: "1px solid " + T.border, color: T.text, fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
+            {[...new Set([hoyDate.getFullYear(), hoyDate.getFullYear()-1, ...aniosDisponibles])].sort((a,b)=>b-a).map(a => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
+          <div style={{ fontSize: 14, color: T.textMuted }}>Total: <b style={{ color: T.tealLight }}>{mmTotalAnio.toFixed(1)} mm</b></div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginBottom: 16 }}>
+        {/* MM por mes */}
+        <div style={{ ...CARD }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: T.textMuted, letterSpacing: "0.06em", marginBottom: 16 }}>MM POR MES — {anioGrafico}</div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={mmPorMes} margin={{ left: -10 }}>
+              <XAxis dataKey="name" tick={{ fontSize: 11, fill: T.textMuted }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: T.textMuted }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={tooltipStyle} formatter={v => [v.toFixed(1) + " mm", "Lluvia"]} />
+              <Bar dataKey="mm" fill={T.teal} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* MM por estación */}
+        <div style={{ ...CARD }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: T.textMuted, letterSpacing: "0.06em", marginBottom: 16 }}>MM POR ESTACIÓN — {anioGrafico}</div>
+          <ResponsiveContainer width="100%" height={220}>
+            <PieChart>
+              <Pie data={mmPorEstacion} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="mm">
+                {mmPorEstacion.map((e, i) => <Cell key={i} fill={e.color} />)}
+              </Pie>
+              <Tooltip contentStyle={tooltipStyle} formatter={v => [v.toFixed(1) + " mm", ""]} />
+              <Legend iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, color: T.textMuted }} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+            {mmPorEstacion.map(e => (
+              <div key={e.name} style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: e.color }}>{e.mm.toFixed(1)}</div>
+                <div style={{ fontSize: 11, color: T.textMuted }}>{e.name}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Comparativo multi-año si hay datos */}
+      {aniosDisponibles.length > 1 && (
+        <div style={{ ...CARD }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: T.textMuted, letterSpacing: "0.06em", marginBottom: 16 }}>COMPARATIVO ANUAL</div>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            {aniosDisponibles.map(anio => {
+              const total = Object.values(registros).filter(r => r.anio === anio).reduce((s,r) => s + r.mm, 0);
+              return (
+                <div key={anio} style={{ background: T.bgHover, border: "1px solid " + T.border, borderRadius: 8, padding: "12px 18px", minWidth: 100, textAlign: "center" }}>
+                  <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 4 }}>{anio}</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: T.tealLight }}>{total.toFixed(0)}</div>
+                  <div style={{ fontSize: 11, color: T.textMuted }}>mm</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── ARRENDAMIENTO ───────────────────────────────────────────────────────────
 function Arrendamiento({ T, parcelas }) {
   const [lotes, setLotes]           = useState([]);
@@ -1768,7 +2045,8 @@ export default function App() {
             {tab === "campo"   && <MapaCampo parcelas={parcelas} infra={infra} T={T} />}
             {tab === "stock"   && <Stock T={T} />}
             {tab === "compras" && <Compras T={T} parcelas={parcelas} />}
-            {tab !== "campo" && tab !== "stock" && tab !== "compras" && tab !== "arrendamiento" && <Placeholder label={NAV_ITEMS.find(n => n.id === tab)?.label} T={T} />}
+            {tab !== "campo" && tab !== "stock" && tab !== "compras" && tab !== "arrendamiento" && tab !== "lluvias" && <Placeholder label={NAV_ITEMS.find(n => n.id === tab)?.label} T={T} />}
+            {tab === "lluvias" && <Lluvias T={T} />}
             {tab === "arrendamiento" && <Arrendamiento T={T} parcelas={parcelas} />}
           </main>
         </div>
