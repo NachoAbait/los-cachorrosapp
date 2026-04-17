@@ -698,7 +698,7 @@ function Lluvias({ T }) {
     "Primavera":[8, 9, 10],
   };
   const ESTACION_COLORS = {
-    "Verano": "#e8a44a", "Otoño": "#c87a3a", "Invierno": "#4a7ec8", "Primavera": "#4e9e43"
+    "Verano": "#e85454", "Otoño": "#c8a84a", "Invierno": "#4a7ec8", "Primavera": "#4e9e43"
   };
 
   useEffect(() => {
@@ -914,13 +914,14 @@ function Lluvias({ T }) {
         <div style={{ ...CARD }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: T.textMuted, letterSpacing: "0.06em", marginBottom: 16 }}>MM POR ESTACIÓN — {anioGrafico}</div>
           <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie data={mmPorEstacion} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="mm">
+            <BarChart data={mmPorEstacion} layout="vertical" margin={{ left: 10, right: 20 }}>
+              <XAxis type="number" tick={{ fontSize: 11, fill: T.textMuted }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: T.textMuted }} axisLine={false} tickLine={false} width={80} />
+              <Tooltip contentStyle={tooltipStyle} formatter={v => [v.toFixed(1) + " mm", "Lluvia"]} />
+              <Bar dataKey="mm" radius={[0, 4, 4, 0]}>
                 {mmPorEstacion.map((e, i) => <Cell key={i} fill={e.color} />)}
-              </Pie>
-              <Tooltip contentStyle={tooltipStyle} formatter={v => [v.toFixed(1) + " mm", ""]} />
-              <Legend iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, color: T.textMuted }} />
-            </PieChart>
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
             {mmPorEstacion.map(e => (
