@@ -112,17 +112,21 @@ const calcDias = (parcela) => {
 };
 
 function MapaCampo({ parcelas, infra, T }) {
-  const [modoEdicion, setModoEdicion]         = useState(false);
+  const [modo, setModo]                       = useState("pastoreo"); // "pastoreo" | "estructuras" | "edicion"
   const [parcelaSelected, setParcelaSelected] = useState(null);
   const [hoveredParcela, setHoveredParcela]   = useState(null);
   const [showAddInfra, setShowAddInfra]       = useState(null);
   const [showInfraModal, setShowInfraModal]   = useState(null);
+  const [editandoRegistro, setEditandoRegistro] = useState(null); // registro a editar
   const [newInfraForm, setNewInfraForm]       = useState({ tipo: "molino", label: "" });
   const [newRegistro, setNewRegistro]         = useState({ fecha: "", desc: "", costo: "" });
   const [loading, setLoading]                 = useState(false);
   const [draggingId, setDraggingId]           = useState(null);
   const mapaRef                               = useRef(null);
   const mouseDownRef                          = useRef({ x: 0, y: 0 });
+
+  const modoEdicion    = modo === "edicion";
+  const modoEstructuras = modo === "estructuras";
 
   const getColors = (data) => {
     if (!data || data.animales === 0) return { bg: T.bgHover, border: T.border, text: T.textDim };
@@ -175,12 +179,17 @@ function MapaCampo({ parcelas, infra, T }) {
 
   const handleAddRegistro = async (item) => {
     if (!newRegistro.fecha || !newRegistro.desc) return;
-    const updated = [...(item.registros || []), { ...newRegistro }];
+    let updated;
+    if (editandoRegistro !== null) {
+      updated = (item.registros || []).map((r, i) => i === editandoRegistro ? { ...newRegistro } : r);
+    } else {
+      updated = [...(item.registros || []), { ...newRegistro }];
+    }
     try {
       await updateDoc(doc(db, "infraestructura", item.id), { registros: updated });
       setShowInfraModal(prev => ({ ...prev, registros: updated }));
       // Si tiene costo, registrar en finanzas automáticamente
-      if (newRegistro.costo && parseFloat(newRegistro.costo) > 0) {
+      if (newRegistro.costo && parseFloat(newRegistro.costo) > 0 && editandoRegistro === null) {
         await addDoc(collection(db, "gastos"), {
           fecha: newRegistro.fecha,
           tipo: "mantenimiento",
@@ -189,11 +198,21 @@ function MapaCampo({ parcelas, infra, T }) {
           moneda: "ARS",
           anio: new Date(newRegistro.fecha).getFullYear(),
           mes:  new Date(newRegistro.fecha).getMonth(),
+          infraId: item.id,
           creadoEn: new Date().toISOString().split("T")[0],
         });
       }
       setNewRegistro({ fecha: "", desc: "", costo: "" });
+      setEditandoRegistro(null);
     } catch (e) { console.error(e); }
+  };
+
+  const handleEliminarRegistro = async (item, idx) => {
+    const updated = (item.registros || []).filter((_, i) => i !== idx);
+    try {
+      await updateDoc(doc(db, "infraestructura", item.id), { registros: updated });
+      setShowInfraModal(prev => ({ ...prev, registros: updated }));
+    } catch(e) { console.error(e); }
   };
 
   const parcelaData = parcelaSelected ? parcelas[parcelaSelected] : null;
@@ -209,7 +228,7 @@ function MapaCampo({ parcelas, infra, T }) {
 
   return (
     <div>
-      {/* Boxes resumen + botón editar */}
+      {/* Boxes resumen + toggles de modo */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "stretch", marginBottom: 16, gap: 12 }}>
         {/* Box arrendamiento */}
         <div style={{ flex: 1, background: T.bgCard, border: "2px solid " + T.teal, borderRadius: 10, padding: "14px 20px", display: "flex", alignItems: "center", gap: 16 }}>
@@ -231,7 +250,7 @@ function MapaCampo({ parcelas, infra, T }) {
           </div>
         </div>
 
-        {/* Leyenda + botón */}
+        {/* Toggles de modo */}
         <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "flex-end", gap: 8 }}>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", justifyContent: "flex-end" }}>
             {[
@@ -245,25 +264,34 @@ function MapaCampo({ parcelas, infra, T }) {
               </div>
             ))}
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            {modoEdicion && (
-              <button onClick={() => { setModoEdicion(false); setShowAddInfra(null); }}
-                style={{ padding: "8px 16px", borderRadius: 6, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
-                Cancelar
+          <div style={{ display: "flex", gap: 6 }}>
+            {[
+              { id: "pastoreo",    label: "Pastoreo",    color: T.green },
+              { id: "estructuras", label: "Estructuras", color: T.brownLight },
+              { id: "edicion",     label: "Editar mapa", color: T.teal },
+            ].map(m => (
+              <button key={m.id}
+                onClick={() => { setModo(modo === m.id ? "pastoreo" : m.id); setShowAddInfra(null); setParcelaSelected(null); }}
+                style={{ padding: "8px 16px", borderRadius: 6, border: modo === m.id ? "none" : "1px solid " + T.border,
+                  background: modo === m.id ? m.color : "transparent",
+                  color: modo === m.id ? "#fff" : T.textMuted,
+                  cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'Outfit', sans-serif", transition: "all 0.15s" }}>
+                {m.label}
               </button>
-            )}
-            <button onClick={() => { setModoEdicion(v => !v); setShowAddInfra(null); setParcelaSelected(null); }}
-              style={{ padding: "8px 20px", borderRadius: 6, border: "none", fontSize: 13, cursor: "pointer", fontFamily: "'Outfit', sans-serif", fontWeight: 600,
-                background: modoEdicion ? T.brownLight : T.teal, color: "#fff" }}>
-              {modoEdicion ? "Guardar mapa" : "Editar mapa"}
-            </button>
+            ))}
           </div>
         </div>
       </div>
 
+      {/* Aviso modo activo */}
+      {modoEstructuras && (
+        <div style={{ padding: "8px 14px", background: T.brown + "18", border: "1px solid " + T.brownLight, borderRadius: 8, marginBottom: 14, fontSize: 13, color: T.brownLight }}>
+          Vista estructuras — hacé click en cualquier ícono para registrar un mantenimiento
+        </div>
+      )}
       {modoEdicion && (
         <div style={{ padding: "8px 14px", background: T.teal + "18", border: "1px solid " + T.teal, borderRadius: 8, marginBottom: 14, fontSize: 13, color: T.tealLight }}>
-          Modo edición — hacé click en cualquier punto del mapa para agregar infraestructura. Click en un ícono existente para editarlo o eliminarlo.
+          Modo edición — hacé click en el mapa para agregar infraestructura. Arrastrá los íconos para reposicionarlos.
         </div>
       )}
 
@@ -308,13 +336,13 @@ function MapaCampo({ parcelas, infra, T }) {
                         transition: "background 0.12s", position: "relative", padding: 4,
                       }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: col.text, letterSpacing: "0.04em", marginBottom: 4 }}>{key}</div>
-                      {!modoEdicion && data && data.animales > 0 ? (
+                      {!modoEdicion && !modoEstructuras && data && data.animales > 0 ? (
                         <>
                           <div style={{ fontSize: 26, fontWeight: 800, color: col.text, lineHeight: 1 }}>{data.animales}</div>
                           <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2 }}>cabezas</div>
                           <div style={{ fontSize: 11, color: T.brownLight, marginTop: 3, fontWeight: 600 }}>{calcDias(data)}d pastoreo</div>
                         </>
-                      ) : !modoEdicion ? (
+                      ) : !modoEdicion && !modoEstructuras ? (
                         <div style={{ fontSize: 10, color: T.textDim, fontStyle: "italic" }}>
                           {data && calcDias(data) > 0 ? calcDias(data) + "d desc." : "Vacío"}
                         </div>
@@ -380,15 +408,23 @@ function MapaCampo({ parcelas, infra, T }) {
               style={{
                 position: "absolute", left: item.x + "%", top: item.y + "%",
                 transform: "translate(-50%,-50%)",
-                fontSize: item.tipo === "casa" ? 20 : 16,
+                fontSize: modoEstructuras ? (item.tipo === "casa" ? 32 : 26) : (item.tipo === "casa" ? 20 : 16),
                 cursor: modoEdicion ? "grab" : "pointer",
                 pointerEvents: "all", zIndex: 20,
-                color: draggingId === item.id ? T.tealLight : T.brownLight,
-                filter: modoEdicion ? "drop-shadow(0 0 6px " + T.brownLight + ")" : "drop-shadow(0 1px 3px " + T.shadow + ")",
+                color: modoEstructuras ? T.brownLight : draggingId === item.id ? T.tealLight : T.brownLight + "88",
+                filter: modoEdicion ? "drop-shadow(0 0 6px " + T.brownLight + ")" :
+                        modoEstructuras ? "drop-shadow(0 2px 8px " + T.shadow + ")" :
+                        "drop-shadow(0 1px 3px " + T.shadow + ")",
                 opacity: draggingId === item.id ? 0.4 : 1,
                 transition: draggingId === item.id ? "none" : "all 0.2s",
               }}>
               {INFRA_ICONS[item.tipo] || "◆"}
+              {/* Label visible en modo estructuras */}
+              {modoEstructuras && (
+                <div style={{ position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)", fontSize: 10, color: T.brownLight, whiteSpace: "nowrap", marginTop: 2, fontWeight: 700, letterSpacing: "0.04em" }}>
+                  {item.label}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -430,45 +466,102 @@ function MapaCampo({ parcelas, infra, T }) {
         )}
       </div>
 
-      {/* Modal infra */}
+      {/* Modal mantenimiento infraestructura */}
       {showInfraModal && (
-        <div onClick={() => setShowInfraModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 12, padding: 24, minWidth: 340, maxWidth: 460, width: "90%", boxShadow: "0 8px 40px " + T.shadow }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: T.cream, fontWeight: 700 }}>
+        <div onClick={() => { setShowInfraModal(null); setEditandoRegistro(null); setNewRegistro({ fecha: "", desc: "", costo: "" }); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: T.bgCard, border: "1px solid " + T.border, borderRadius: 12,
+            padding: 24, minWidth: 400, maxWidth: 540, width: "92%",
+            boxShadow: "0 8px 40px " + T.shadow, maxHeight: "88vh", overflowY: "auto",
+          }}>
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, color: T.cream, fontWeight: 700 }}>
                 {INFRA_ICONS[showInfraModal.tipo]} {showInfraModal.label}
               </div>
               {modoEdicion && (
                 <button onClick={() => handleDeleteInfra(showInfraModal.id)} disabled={loading}
                   style={{ padding: "5px 12px", borderRadius: 6, border: "none", background: T.red + "22", color: T.red, cursor: "pointer", fontSize: 12, fontFamily: "'Outfit', sans-serif" }}>
-                  Eliminar
+                  Eliminar estructura
                 </button>
               )}
             </div>
-            <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 14 }}>
+            <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 18 }}>
               Tipo: <span style={{ color: T.brownLight, fontWeight: 600 }}>{showInfraModal.tipo}</span>
             </div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: "0.07em", marginBottom: 8 }}>HISTORIAL DE ARREGLOS</div>
+
+            {/* Historial de mantenimientos */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: "0.07em", marginBottom: 10 }}>HISTORIAL DE MANTENIMIENTOS</div>
             {(!showInfraModal.registros || showInfraModal.registros.length === 0)
-              ? <div style={{ fontSize: 12, color: T.textDim, fontStyle: "italic", marginBottom: 12 }}>Sin registros aún</div>
+              ? <div style={{ fontSize: 13, color: T.textDim, fontStyle: "italic", marginBottom: 14 }}>Sin registros aún</div>
               : showInfraModal.registros.map((r, i) => (
-                <div key={i} style={{ fontSize: 12, padding: "7px 10px", background: T.bgHover, borderRadius: 6, marginBottom: 4, borderLeft: "3px solid " + T.brownLight, color: T.text }}>
-                  <span style={{ color: T.brownLight, fontWeight: 600 }}>{r.fecha}</span> — {r.desc}
+                <div key={i} style={{ padding: "10px 12px", background: T.bgHover, borderRadius: 8, marginBottom: 6, borderLeft: "3px solid " + T.brownLight }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      <span style={{ color: T.brownLight, fontWeight: 700, fontSize: 12 }}>{r.fecha}</span>
+                      {r.costo && parseFloat(r.costo) > 0 && (
+                        <span style={{ fontSize: 11, padding: "1px 8px", borderRadius: 12, background: T.green + "22", color: T.greenLight, border: "1px solid " + T.green, fontWeight: 700 }}>
+                          $ {new Intl.NumberFormat("es-AR").format(r.costo)}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => {
+                        setEditandoRegistro(i);
+                        setNewRegistro({ fecha: r.fecha, desc: r.desc, costo: r.costo || "" });
+                      }} style={{ padding: "2px 8px", borderRadius: 4, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 11 }}>
+                        Editar
+                      </button>
+                      <button onClick={() => handleEliminarRegistro(showInfraModal, i)}
+                        style={{ padding: "2px 8px", borderRadius: 4, border: "none", background: T.red + "22", color: T.red, cursor: "pointer", fontSize: 11 }}>
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 13, color: T.text }}>{r.desc}</div>
                 </div>
               ))
             }
-            <div style={{ borderTop: "1px solid " + T.border, paddingTop: 14, marginTop: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: "0.07em", marginBottom: 8 }}>AGREGAR REGISTRO</div>
-              <input type="date" value={newRegistro.fecha} onChange={e => setNewRegistro(r => ({ ...r, fecha: e.target.value }))} style={{ ...inp, marginBottom: 8 }} />
-              <input placeholder="Descripción del arreglo..." value={newRegistro.desc} onChange={e => setNewRegistro(r => ({ ...r, desc: e.target.value }))} style={{ ...inp, marginBottom: 8 }} />
-              <input type="number" placeholder="Costo del arreglo $ (opcional — se suma a Finanzas)" value={newRegistro.costo} onChange={e => setNewRegistro(r => ({ ...r, costo: e.target.value }))} style={{ ...inp, marginBottom: 12 }} />
-              <button onClick={() => handleAddRegistro(showInfraModal)}
-                style={{ width: "100%", padding: "8px 0", borderRadius: 6, border: "none", background: T.teal, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
-                Agregar registro
-              </button>
+
+            {/* Formulario agregar/editar */}
+            <div style={{ borderTop: "1px solid " + T.border, paddingTop: 16, marginTop: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: "0.07em", marginBottom: 10 }}>
+                {editandoRegistro !== null ? "EDITAR REGISTRO" : "NUEVO MANTENIMIENTO"}
+              </div>
+              <input type="date" value={newRegistro.fecha}
+                onChange={e => setNewRegistro(r => ({ ...r, fecha: e.target.value }))}
+                style={{ ...inp, marginBottom: 8 }} />
+              <input placeholder="Descripción del trabajo realizado..."
+                value={newRegistro.desc}
+                onChange={e => setNewRegistro(r => ({ ...r, desc: e.target.value }))}
+                style={{ ...inp, marginBottom: 8 }} />
+              <input type="number" placeholder="Costo $ (opcional — se registra en Finanzas)"
+                value={newRegistro.costo}
+                onChange={e => setNewRegistro(r => ({ ...r, costo: e.target.value }))}
+                style={{ ...inp, marginBottom: 8 }} />
+
+              {/* Fotos — placeholder hasta Cloudinary */}
+              <div style={{ padding: "12px 14px", background: T.bgHover, borderRadius: 8, marginBottom: 12, border: "1px dashed " + T.border, textAlign: "center", cursor: "not-allowed", opacity: 0.6 }}>
+                <div style={{ fontSize: 13, color: T.textMuted }}>📷 Agregar fotos — disponible próximamente</div>
+              </div>
+
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => handleAddRegistro(showInfraModal)} disabled={loading || !newRegistro.fecha || !newRegistro.desc}
+                  style={{ flex: 1, padding: "9px 0", borderRadius: 7, border: "none", background: T.brownLight, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'Outfit', sans-serif", opacity: loading ? 0.7 : 1 }}>
+                  {editandoRegistro !== null ? "Guardar cambios" : "Agregar registro"}
+                </button>
+                {editandoRegistro !== null && (
+                  <button onClick={() => { setEditandoRegistro(null); setNewRegistro({ fecha: "", desc: "", costo: "" }); }}
+                    style={{ padding: "9px 16px", borderRadius: 7, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
+                    Cancelar
+                  </button>
+                )}
+              </div>
             </div>
-            <button onClick={() => setShowInfraModal(null)}
-              style={{ width: "100%", marginTop: 10, padding: "8px 0", borderRadius: 6, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
+
+            <button onClick={() => { setShowInfraModal(null); setEditandoRegistro(null); setNewRegistro({ fecha: "", desc: "", costo: "" }); }}
+              style={{ width: "100%", marginTop: 12, padding: "9px 0", borderRadius: 7, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
               Cerrar
             </button>
           </div>
@@ -688,6 +781,143 @@ function ParcelaPanel({ parcelaId, parcelaData, parcelas, T, onClose }) {
           </div>
         ))
       )}
+    </div>
+  );
+}
+
+// ─── MANTENIMIENTO ───────────────────────────────────────────────────────────
+function Mantenimiento({ T, infra }) {
+  const [gastos, setGastos]         = useState([]);
+  const [filtroAnio, setFiltroAnio] = useState(new Date().getFullYear());
+  const [filtroMes, setFiltroMes]   = useState(-1); // -1 = todos
+
+  const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "gastos"), snap => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .filter(g => g.tipo === "mantenimiento");
+      data.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+      setGastos(data);
+    });
+    return () => unsub();
+  }, []);
+
+  const fmt = (n) => n ? new Intl.NumberFormat("es-AR").format(Math.round(n)) : "0";
+
+  const gastosFiltrados = gastos.filter(g => {
+    const anioOk = new Date(g.fecha).getFullYear() === filtroAnio;
+    const mesOk  = filtroMes === -1 || new Date(g.fecha).getMonth() === filtroMes;
+    return anioOk && mesOk;
+  });
+
+  const totalAnio = gastos.filter(g => new Date(g.fecha).getFullYear() === filtroAnio)
+    .reduce((s, g) => s + (g.monto || 0), 0);
+
+  const totalFiltrado = gastosFiltrados.reduce((s, g) => s + (g.monto || 0), 0);
+
+  // Desglose por mes
+  const porMes = Array.from({ length: 12 }, (_, i) => ({
+    mes: MESES[i],
+    total: gastos.filter(g => new Date(g.fecha).getFullYear() === filtroAnio && new Date(g.fecha).getMonth() === i)
+      .reduce((s, g) => s + (g.monto || 0), 0),
+    cantidad: gastos.filter(g => new Date(g.fecha).getFullYear() === filtroAnio && new Date(g.fecha).getMonth() === i).length,
+  }));
+
+  const aniosDisp = [...new Set([new Date().getFullYear(), ...gastos.map(g => new Date(g.fecha).getFullYear())])].sort((a,b) => b-a);
+
+  const CARD = { background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10, padding: "18px 22px" };
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 26, color: T.cream, fontWeight: 700 }}>Mantenimiento</div>
+          <div style={{ fontSize: 14, color: T.textMuted, marginTop: 2 }}>
+            Para registrar mantenimientos andá al mapa → Vista Estructuras → click en la estructura
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <select value={filtroAnio} onChange={e => setFiltroAnio(parseInt(e.target.value))}
+            style={{ padding: "8px 12px", borderRadius: 6, background: T.bgCard, border: "1px solid " + T.border, color: T.text, fontSize: 14, fontFamily: "'Outfit', sans-serif" }}>
+            {aniosDisp.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+          <select value={filtroMes} onChange={e => setFiltroMes(parseInt(e.target.value))}
+            style={{ padding: "8px 12px", borderRadius: 6, background: T.bgCard, border: "1px solid " + T.border, color: T.text, fontSize: 14, fontFamily: "'Outfit', sans-serif" }}>
+            <option value={-1}>Todos los meses</option>
+            {MESES.map((m, i) => <option key={i} value={i}>{m}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+        <div style={{ ...CARD, border: "2px solid " + T.brownLight }}>
+          <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 6 }}>Total mantenimiento {filtroAnio}</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: T.brownLight, lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>$ {fmt(totalAnio)}</div>
+        </div>
+        <div style={{ ...CARD }}>
+          <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 6 }}>
+            {filtroMes === -1 ? "Período seleccionado" : MESES[filtroMes] + " " + filtroAnio}
+          </div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: T.text, lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>$ {fmt(totalFiltrado)}</div>
+        </div>
+        <div style={{ ...CARD }}>
+          <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 6 }}>Registros en período</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: T.text, lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>{gastosFiltrados.length}</div>
+        </div>
+      </div>
+
+      {/* Desglose mensual */}
+      <div style={{ ...CARD, marginBottom: 20 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: T.textMuted, letterSpacing: "0.06em", marginBottom: 14 }}>DESGLOSE MENSUAL — {filtroAnio}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+          {porMes.map((m, i) => (
+            <div key={i}
+              onClick={() => setFiltroMes(filtroMes === i ? -1 : i)}
+              style={{ background: filtroMes === i ? T.brown + "33" : T.bgHover, border: "1px solid " + (filtroMes === i ? T.brownLight : T.border),
+                borderRadius: 8, padding: "10px 14px", cursor: "pointer", transition: "all 0.15s" }}>
+              <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 4 }}>{m.mes}</div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: m.total > 0 ? T.brownLight : T.textDim }}>
+                {m.total > 0 ? "$ " + fmt(m.total) : "—"}
+              </div>
+              {m.cantidad > 0 && <div style={{ fontSize: 11, color: T.textDim, marginTop: 2 }}>{m.cantidad} registro{m.cantidad > 1 ? "s" : ""}</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Listado de registros */}
+      <div style={{ ...CARD }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: T.textMuted, letterSpacing: "0.06em", marginBottom: 14 }}>
+          REGISTROS {filtroMes !== -1 ? MESES[filtroMes].toUpperCase() + " " : ""}{filtroAnio}
+        </div>
+        {gastosFiltrados.length === 0 ? (
+          <div style={{ fontSize: 13, color: T.textDim, fontStyle: "italic" }}>Sin registros en el período seleccionado</div>
+        ) : (
+          gastosFiltrados.map(g => (
+            <div key={g.id} style={{ padding: "12px 14px", background: T.bgHover, borderRadius: 8, marginBottom: 8, borderLeft: "3px solid " + T.brownLight }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+                <div>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 4 }}>
+                    <span style={{ color: T.brownLight, fontWeight: 700, fontSize: 13 }}>{g.fecha}</span>
+                    {g.descripcion.includes(" — ") && (
+                      <span style={{ fontSize: 12, padding: "1px 8px", borderRadius: 12, background: T.brown + "22", color: T.brownLight, border: "1px solid " + T.brown, fontWeight: 700 }}>
+                        {g.descripcion.split(" — ")[0]}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 14, color: T.text }}>
+                    {g.descripcion.includes(" — ") ? g.descripcion.split(" — ")[1] : g.descripcion}
+                  </div>
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: T.brownLight }}>$ {fmt(g.monto)}</div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -2380,8 +2610,9 @@ export default function App() {
             {tab === "campo"   && <MapaCampo parcelas={parcelas} infra={infra} T={T} />}
             {tab === "stock"   && <Stock T={T} />}
             {tab === "compras" && <Compras T={T} parcelas={parcelas} />}
-            {tab !== "campo" && tab !== "stock" && tab !== "compras" && tab !== "arrendamiento" && tab !== "lluvias" && tab !== "finanzas" && <Placeholder label={NAV_ITEMS.find(n => n.id === tab)?.label} T={T} />}
-            {tab === "finanzas" && <Finanzas T={T} />}
+            {tab !== "campo" && tab !== "stock" && tab !== "compras" && tab !== "arrendamiento" && tab !== "lluvias" && tab !== "finanzas" && tab !== "mantenimiento" && <Placeholder label={NAV_ITEMS.find(n => n.id === tab)?.label} T={T} />}
+            {tab === "finanzas"     && <Finanzas T={T} />}
+            {tab === "mantenimiento" && <Mantenimiento T={T} infra={infra} />}
             {tab === "lluvias" && <Lluvias T={T} />}
             {tab === "arrendamiento" && <Arrendamiento T={T} parcelas={parcelas} />}
           </main>
