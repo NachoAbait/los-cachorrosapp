@@ -118,7 +118,7 @@ function MapaCampo({ parcelas, infra, T }) {
   const [showAddInfra, setShowAddInfra]       = useState(null);
   const [showInfraModal, setShowInfraModal]   = useState(null);
   const [newInfraForm, setNewInfraForm]       = useState({ tipo: "molino", label: "" });
-  const [newRegistro, setNewRegistro]         = useState({ fecha: "", desc: "" });
+  const [newRegistro, setNewRegistro]         = useState({ fecha: "", desc: "", costo: "" });
   const [loading, setLoading]                 = useState(false);
   const [draggingId, setDraggingId]           = useState(null);
   const mapaRef                               = useRef(null);
@@ -179,7 +179,20 @@ function MapaCampo({ parcelas, infra, T }) {
     try {
       await updateDoc(doc(db, "infraestructura", item.id), { registros: updated });
       setShowInfraModal(prev => ({ ...prev, registros: updated }));
-      setNewRegistro({ fecha: "", desc: "" });
+      // Si tiene costo, registrar en finanzas automáticamente
+      if (newRegistro.costo && parseFloat(newRegistro.costo) > 0) {
+        await addDoc(collection(db, "gastos"), {
+          fecha: newRegistro.fecha,
+          tipo: "mantenimiento",
+          descripcion: item.label + " — " + newRegistro.desc,
+          monto: parseFloat(newRegistro.costo),
+          moneda: "ARS",
+          anio: new Date(newRegistro.fecha).getFullYear(),
+          mes:  new Date(newRegistro.fecha).getMonth(),
+          creadoEn: new Date().toISOString().split("T")[0],
+        });
+      }
+      setNewRegistro({ fecha: "", desc: "", costo: "" });
     } catch (e) { console.error(e); }
   };
 
@@ -447,7 +460,8 @@ function MapaCampo({ parcelas, infra, T }) {
             <div style={{ borderTop: "1px solid " + T.border, paddingTop: 14, marginTop: 10 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: "0.07em", marginBottom: 8 }}>AGREGAR REGISTRO</div>
               <input type="date" value={newRegistro.fecha} onChange={e => setNewRegistro(r => ({ ...r, fecha: e.target.value }))} style={{ ...inp, marginBottom: 8 }} />
-              <input placeholder="Descripción..." value={newRegistro.desc} onChange={e => setNewRegistro(r => ({ ...r, desc: e.target.value }))} style={{ ...inp, marginBottom: 12 }} />
+              <input placeholder="Descripción del arreglo..." value={newRegistro.desc} onChange={e => setNewRegistro(r => ({ ...r, desc: e.target.value }))} style={{ ...inp, marginBottom: 8 }} />
+              <input type="number" placeholder="Costo del arreglo $ (opcional — se suma a Finanzas)" value={newRegistro.costo} onChange={e => setNewRegistro(r => ({ ...r, costo: e.target.value }))} style={{ ...inp, marginBottom: 12 }} />
               <button onClick={() => handleAddRegistro(showInfraModal)}
                 style={{ width: "100%", padding: "8px 0", borderRadius: 6, border: "none", background: T.teal, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
                 Agregar registro
@@ -674,6 +688,325 @@ function ParcelaPanel({ parcelaId, parcelaData, parcelas, T, onClose }) {
           </div>
         ))
       )}
+    </div>
+  );
+}
+
+// ─── FINANZAS ─────────────────────────────────────────────────────────────────
+function Finanzas({ T }) {
+  const hoy = new Date();
+  const anioActual = hoy.getFullYear();
+  const [anio, setAnio]             = useState(anioActual);
+  const [gastos, setGastos]         = useState([]);
+  const [compras, setCompras]       = useState([]);
+  const [ventas, setVentas]         = useState([]);
+  const [showFormGasto, setShowFormGasto] = useState(false);
+  const [showFormVenta, setShowFormVenta] = useState(false);
+  const [editandoSueldo, setEditandoSueldo] = useState(null); // mes key
+  const [loading, setLoading]       = useState(false);
+
+  const [formGasto, setFormGasto] = useState({
+    fecha: hoy.toISOString().split("T")[0],
+    tipo: "otro", descripcion: "", monto: "", moneda: "ARS",
+  });
+  const [formVenta, setFormVenta] = useState({
+    fecha: hoy.toISOString().split("T")[0],
+    tropa: "", cabezas: "", pesoPromedio: "", precioKg: "",
+    moneda: "ARS", observaciones: "",
+  });
+
+  const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+
+  useEffect(() => {
+    const u1 = onSnapshot(collection(db, "gastos"), snap => {
+      setGastos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    const u2 = onSnapshot(collection(db, "compras"), snap => {
+      setCompras(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    const u3 = onSnapshot(collection(db, "ventas"), snap => {
+      setVentas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => { u1(); u2(); u3(); };
+  }, []);
+
+  const gastosFiltrados = gastos.filter(g => new Date(g.fecha).getFullYear() === anio);
+  const comprasFiltradas = compras.filter(c => new Date(c.fecha).getFullYear() === anio);
+  const ventasFiltradas  = ventas.filter(v => new Date(v.fecha).getFullYear() === anio);
+
+  const totalGastos  = gastosFiltrados.reduce((s, g) => s + (g.monto || 0), 0);
+  const totalCompras = comprasFiltradas.reduce((s, c) => s + (c.total || 0), 0);
+  const totalVentas  = ventasFiltradas.reduce((s, v) => s + (v.total || 0), 0);
+  const rentabilidad = totalVentas - totalCompras - totalGastos;
+
+  // Desglose por mes
+  const desgloseMes = Array.from({ length: 12 }, (_, i) => {
+    const gastosM   = gastosFiltrados.filter(g => new Date(g.fecha).getMonth() === i);
+    const sueldoM   = gastosM.filter(g => g.tipo === "sueldo").reduce((s,g) => s+(g.monto||0), 0);
+    const mantM     = gastosM.filter(g => g.tipo === "mantenimiento").reduce((s,g) => s+(g.monto||0), 0);
+    const otroM     = gastosM.filter(g => g.tipo === "otro").reduce((s,g) => s+(g.monto||0), 0);
+    const ventasM   = ventasFiltradas.filter(v => new Date(v.fecha).getMonth() === i).reduce((s,v) => s+(v.total||0), 0);
+    return { mes: MESES[i], sueldo: sueldoM, mantenimiento: mantM, otro: otroM, total: sueldoM+mantM+otroM, ventas: ventasM };
+  });
+
+  const handleGuardarGasto = async () => {
+    if (!formGasto.monto || !formGasto.descripcion) return;
+    setLoading(true);
+    try {
+      await addDoc(collection(db, "gastos"), {
+        ...formGasto,
+        monto: parseFloat(formGasto.monto),
+        anio: new Date(formGasto.fecha).getFullYear(),
+        mes:  new Date(formGasto.fecha).getMonth(),
+        creadoEn: hoy.toISOString().split("T")[0],
+      });
+      setShowFormGasto(false);
+      setFormGasto({ fecha: hoy.toISOString().split("T")[0], tipo: "otro", descripcion: "", monto: "", moneda: "ARS" });
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  const handleGuardarSueldo = async (mes, monto) => {
+    if (!monto) return;
+    setLoading(true);
+    try {
+      const fecha = `${anio}-${String(mes+1).padStart(2,"0")}-01`;
+      await addDoc(collection(db, "gastos"), {
+        fecha, tipo: "sueldo", descripcion: "Sueldo puestero " + MESES[mes] + " " + anio,
+        monto: parseFloat(monto), moneda: "ARS",
+        anio, mes, creadoEn: hoy.toISOString().split("T")[0],
+      });
+      setEditandoSueldo(null);
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  const handleGuardarVenta = async () => {
+    if (!formVenta.cabezas || !formVenta.precioKg || !formVenta.pesoPromedio) return;
+    setLoading(true);
+    try {
+      const cab  = parseInt(formVenta.cabezas);
+      const peso = parseFloat(formVenta.pesoPromedio);
+      const pKg  = parseFloat(formVenta.precioKg);
+      const total = cab * peso * pKg;
+      await addDoc(collection(db, "ventas"), {
+        ...formVenta,
+        cabezas: cab, pesoPromedio: peso, precioKg: pKg,
+        kgTotal: cab * peso, total,
+        anio: new Date(formVenta.fecha).getFullYear(),
+        mes:  new Date(formVenta.fecha).getMonth(),
+        creadoEn: hoy.toISOString().split("T")[0],
+      });
+      setShowFormVenta(false);
+      setFormVenta({ fecha: hoy.toISOString().split("T")[0], tropa: "", cabezas: "", pesoPromedio: "", precioKg: "", moneda: "ARS", observaciones: "" });
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  const handleEliminarGasto = async (id) => {
+    try { await deleteDoc(doc(db, "gastos", id)); } catch(e) { console.error(e); }
+  };
+
+  const fmt = (n) => n ? new Intl.NumberFormat("es-AR").format(Math.round(n)) : "0";
+
+  const inp = {
+    width: "100%", padding: "10px 12px", borderRadius: 6, fontSize: 14,
+    background: T.bgInput, border: "1px solid " + T.border,
+    color: T.text, boxSizing: "border-box", outline: "none", fontFamily: "'Outfit', sans-serif",
+  };
+  const CARD = { background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10, padding: "18px 22px" };
+
+  const aniosDisp = [...new Set([anioActual, anioActual-1, ...gastos.map(g=>g.anio), ...ventas.map(v=>v.anio)])].filter(Boolean).sort((a,b)=>b-a);
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 26, color: T.cream, fontWeight: 700 }}>Finanzas</div>
+          <div style={{ fontSize: 14, color: T.textMuted, marginTop: 2 }}>Control económico del campo</div>
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <select value={anio} onChange={e => setAnio(parseInt(e.target.value))}
+            style={{ padding: "8px 14px", borderRadius: 6, background: T.bgCard, border: "1px solid " + T.border, color: T.text, fontSize: 14, fontFamily: "'Outfit', sans-serif" }}>
+            {aniosDisp.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+          <button onClick={() => setShowFormVenta(v => !v)}
+            style={{ padding: "9px 18px", borderRadius: 7, border: "none", background: T.greenLight, color: T.bg, cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
+            + Registrar venta
+          </button>
+          <button onClick={() => setShowFormGasto(v => !v)}
+            style={{ padding: "9px 18px", borderRadius: 7, border: "none", background: T.brown, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
+            + Agregar gasto
+          </button>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Total ventas",    value: "$ " + fmt(totalVentas),  color: T.greenLight },
+          { label: "Total compras",   value: "$ " + fmt(totalCompras), color: T.red },
+          { label: "Total gastos",    value: "$ " + fmt(totalGastos),  color: T.brownLight },
+          { label: "Rentabilidad",    value: "$ " + fmt(rentabilidad), color: rentabilidad >= 0 ? T.greenLight : T.red, big: true },
+        ].map(s => (
+          <div key={s.label} style={{ ...CARD, border: s.big ? "2px solid " + (rentabilidad >= 0 ? T.green : T.red) : "1px solid " + T.border }}>
+            <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 6 }}>{s.label} {anio}</div>
+            <div style={{ fontSize: s.big ? 24 : 22, fontWeight: 800, color: s.color, lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>{s.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Formulario venta */}
+      {showFormVenta && (
+        <div style={{ ...CARD, border: "1px solid " + T.green, marginBottom: 20 }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 19, color: T.greenLight, marginBottom: 16, fontWeight: 700 }}>Registrar venta de hacienda</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Fecha</div><input type="date" value={formVenta.fecha} onChange={e => setFormVenta(f=>({...f,fecha:e.target.value}))} style={inp}/></div>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Tropa</div><input placeholder="Ej: T-2025-01" value={formVenta.tropa} onChange={e => setFormVenta(f=>({...f,tropa:e.target.value}))} style={inp}/></div>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Cabezas</div><input type="number" value={formVenta.cabezas} onChange={e => setFormVenta(f=>({...f,cabezas:e.target.value}))} style={inp}/></div>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Peso promedio (kg)</div><input type="number" value={formVenta.pesoPromedio} onChange={e => setFormVenta(f=>({...f,pesoPromedio:e.target.value}))} style={inp}/></div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Precio por kg</div><input type="number" value={formVenta.precioKg} onChange={e => setFormVenta(f=>({...f,precioKg:e.target.value}))} style={inp}/></div>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Moneda</div>
+              <select value={formVenta.moneda} onChange={e => setFormVenta(f=>({...f,moneda:e.target.value}))} style={inp}>
+                <option value="ARS">Pesos (ARS)</option><option value="USD">Dólares (USD)</option>
+              </select>
+            </div>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Observaciones</div><input value={formVenta.observaciones} onChange={e => setFormVenta(f=>({...f,observaciones:e.target.value}))} style={inp}/></div>
+          </div>
+          {formVenta.cabezas && formVenta.pesoPromedio && formVenta.precioKg && (
+            <div style={{ padding: "10px 16px", background: T.bgHover, borderRadius: 8, marginBottom: 12, fontSize: 14, color: T.greenLight, fontWeight: 700 }}>
+              Total venta: {formVenta.moneda} $ {fmt(parseInt(formVenta.cabezas) * parseFloat(formVenta.pesoPromedio) * parseFloat(formVenta.precioKg))}
+            </div>
+          )}
+          <button onClick={handleGuardarVenta} disabled={loading}
+            style={{ padding: "10px 28px", borderRadius: 7, border: "none", background: T.green, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
+            {loading ? "Guardando..." : "Guardar venta"}
+          </button>
+        </div>
+      )}
+
+      {/* Formulario gasto */}
+      {showFormGasto && (
+        <div style={{ ...CARD, border: "1px solid " + T.brown, marginBottom: 20 }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 19, color: T.brownLight, marginBottom: 16, fontWeight: 700 }}>Agregar gasto</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Fecha</div><input type="date" value={formGasto.fecha} onChange={e => setFormGasto(f=>({...f,fecha:e.target.value}))} style={inp}/></div>
+            <div>
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Tipo</div>
+              <select value={formGasto.tipo} onChange={e => setFormGasto(f=>({...f,tipo:e.target.value}))} style={inp}>
+                <option value="sueldo">Sueldo puestero</option>
+                <option value="mantenimiento">Mantenimiento</option>
+                <option value="otro">Otro</option>
+              </select>
+            </div>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Descripción</div><input placeholder="Ej: Arreglo molino norte" value={formGasto.descripcion} onChange={e => setFormGasto(f=>({...f,descripcion:e.target.value}))} style={inp}/></div>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Monto ($)</div><input type="number" placeholder="Ej: 1000000" value={formGasto.monto} onChange={e => setFormGasto(f=>({...f,monto:e.target.value}))} style={inp}/></div>
+          </div>
+          <button onClick={handleGuardarGasto} disabled={loading}
+            style={{ padding: "10px 28px", borderRadius: 7, border: "none", background: T.brown, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
+            {loading ? "Guardando..." : "Guardar gasto"}
+          </button>
+        </div>
+      )}
+
+      {/* Desglose mensual */}
+      <div style={{ ...CARD, marginBottom: 20 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: T.textMuted, letterSpacing: "0.06em", marginBottom: 16 }}>DESGLOSE MENSUAL — {anio}</div>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: "2px solid " + T.border }}>
+                {["Mes","Sueldo puestero","Mantenimiento","Otros gastos","Total gastos","Ventas","Resultado"].map(h => (
+                  <th key={h} style={{ padding: "8px 12px", textAlign: h === "Mes" ? "left" : "right", color: T.textMuted, fontWeight: 700, fontSize: 11, letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
+                ))}
+                <th style={{ width: 80 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {desgloseMes.map((m, i) => {
+                const resultado = m.ventas - m.total;
+                const editando  = editandoSueldo === i;
+                const [sueldoInput, setSueldoInput] = useState("");
+                return (
+                  <tr key={m.mes} style={{ borderBottom: "1px solid " + T.border, background: i%2===0 ? T.bgHover+"66" : "transparent" }}>
+                    <td style={{ padding: "10px 12px", color: T.cream, fontWeight: 600 }}>{m.mes}</td>
+                    <td style={{ padding: "10px 12px", textAlign: "right" }}>
+                      {editando ? (
+                        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                          <input type="number" value={sueldoInput} onChange={e => setSueldoInput(e.target.value)}
+                            style={{ width: 120, padding: "4px 8px", borderRadius: 4, background: T.bgInput, border: "1px solid " + T.teal, color: T.text, fontSize: 13, fontFamily: "'Outfit', sans-serif" }} autoFocus />
+                          <button onClick={() => handleGuardarSueldo(i, sueldoInput)}
+                            style={{ padding: "4px 10px", borderRadius: 4, border: "none", background: T.teal, color: "#fff", cursor: "pointer", fontSize: 12 }}>✓</button>
+                          <button onClick={() => setEditandoSueldo(null)}
+                            style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 12 }}>✕</button>
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
+                          <span style={{ color: m.sueldo > 0 ? T.text : T.textDim }}>{m.sueldo > 0 ? "$ " + fmt(m.sueldo) : "—"}</span>
+                          <button onClick={() => { setEditandoSueldo(i); setSueldoInput(String(m.sueldo || 1000000)); }}
+                            style={{ padding: "2px 8px", borderRadius: 4, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 11 }}>
+                            {m.sueldo > 0 ? "editar" : "+ cargar"}
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ padding: "10px 12px", textAlign: "right", color: m.mantenimiento > 0 ? T.text : T.textDim }}>{m.mantenimiento > 0 ? "$ " + fmt(m.mantenimiento) : "—"}</td>
+                    <td style={{ padding: "10px 12px", textAlign: "right", color: m.otro > 0 ? T.text : T.textDim }}>{m.otro > 0 ? "$ " + fmt(m.otro) : "—"}</td>
+                    <td style={{ padding: "10px 12px", textAlign: "right", color: T.brownLight, fontWeight: 700 }}>{m.total > 0 ? "$ " + fmt(m.total) : "—"}</td>
+                    <td style={{ padding: "10px 12px", textAlign: "right", color: T.greenLight, fontWeight: 700 }}>{m.ventas > 0 ? "$ " + fmt(m.ventas) : "—"}</td>
+                    <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700, color: resultado > 0 ? T.greenLight : resultado < 0 ? T.red : T.textDim }}>
+                      {m.total > 0 || m.ventas > 0 ? (resultado >= 0 ? "+ " : "") + "$ " + fmt(resultado) : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr style={{ borderTop: "2px solid " + T.border }}>
+                <td style={{ padding: "12px 12px", color: T.cream, fontWeight: 700 }}>TOTAL {anio}</td>
+                <td style={{ padding: "12px 12px", textAlign: "right", color: T.brownLight, fontWeight: 700 }}>$ {fmt(gastosFiltrados.filter(g=>g.tipo==="sueldo").reduce((s,g)=>s+g.monto,0))}</td>
+                <td style={{ padding: "12px 12px", textAlign: "right", color: T.brownLight, fontWeight: 700 }}>$ {fmt(gastosFiltrados.filter(g=>g.tipo==="mantenimiento").reduce((s,g)=>s+g.monto,0))}</td>
+                <td style={{ padding: "12px 12px", textAlign: "right", color: T.brownLight, fontWeight: 700 }}>$ {fmt(gastosFiltrados.filter(g=>g.tipo==="otro").reduce((s,g)=>s+g.monto,0))}</td>
+                <td style={{ padding: "12px 12px", textAlign: "right", color: T.red, fontWeight: 800 }}>$ {fmt(totalGastos)}</td>
+                <td style={{ padding: "12px 12px", textAlign: "right", color: T.greenLight, fontWeight: 800 }}>$ {fmt(totalVentas)}</td>
+                <td style={{ padding: "12px 12px", textAlign: "right", fontWeight: 800, color: rentabilidad >= 0 ? T.greenLight : T.red }}>
+                  {(rentabilidad >= 0 ? "+ " : "") + "$ " + fmt(rentabilidad)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      {/* Listado de gastos del año */}
+      <div style={{ ...CARD }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: T.textMuted, letterSpacing: "0.06em", marginBottom: 14 }}>GASTOS REGISTRADOS — {anio}</div>
+        {gastosFiltrados.length === 0
+          ? <div style={{ fontSize: 13, color: T.textDim, fontStyle: "italic" }}>Sin gastos registrados</div>
+          : gastosFiltrados.sort((a,b) => new Date(b.fecha)-new Date(a.fecha)).map(g => (
+            <div key={g.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderRadius: 6, marginBottom: 4, background: T.bgHover, flexWrap: "wrap", gap: 8 }}>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <span style={{ fontSize: 12, color: T.brownLight, fontWeight: 600, minWidth: 80 }}>{g.fecha}</span>
+                <span style={{ padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 700,
+                  background: g.tipo === "sueldo" ? T.teal+"22" : g.tipo === "mantenimiento" ? T.brown+"22" : T.bgCard,
+                  color: g.tipo === "sueldo" ? T.tealLight : g.tipo === "mantenimiento" ? T.brownLight : T.textMuted,
+                  border: "1px solid " + (g.tipo === "sueldo" ? T.teal : g.tipo === "mantenimiento" ? T.brown : T.border) }}>
+                  {g.tipo}
+                </span>
+                <span style={{ fontSize: 13, color: T.text }}>{g.descripcion}</span>
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: T.brownLight }}>$ {fmt(g.monto)}</span>
+                <button onClick={() => handleEliminarGasto(g.id)}
+                  style={{ padding: "3px 10px", borderRadius: 4, border: "none", background: T.red+"22", color: T.red, cursor: "pointer", fontSize: 12 }}>✕</button>
+              </div>
+            </div>
+          ))
+        }
+      </div>
     </div>
   );
 }
@@ -1098,12 +1431,11 @@ function Arrendamiento({ T, parcelas }) {
 
       {/* Dashboard KG acumulados */}
       {lotes.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
           {[
             { label: "Cabezas arrendadas",  value: totalCabezas,       unit: "cab.",     color: T.tealLight },
             { label: "Meses promedio",       value: totalMesesPromedio, unit: "meses",    color: T.text },
             { label: "Kg totales acumulados",value: fmt(totalKgAcumulados), unit: "kg",  color: T.greenLight },
-            { label: "Lotes activos",        value: lotes.filter(l => (l.stockRestante || 0) > 0).length, unit: "lotes", color: T.brownLight },
           ].map(s => (
             <div key={s.label} style={{ ...CARD }}>
               <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 6 }}>{s.label}</div>
@@ -2048,7 +2380,8 @@ export default function App() {
             {tab === "campo"   && <MapaCampo parcelas={parcelas} infra={infra} T={T} />}
             {tab === "stock"   && <Stock T={T} />}
             {tab === "compras" && <Compras T={T} parcelas={parcelas} />}
-            {tab !== "campo" && tab !== "stock" && tab !== "compras" && tab !== "arrendamiento" && tab !== "lluvias" && <Placeholder label={NAV_ITEMS.find(n => n.id === tab)?.label} T={T} />}
+            {tab !== "campo" && tab !== "stock" && tab !== "compras" && tab !== "arrendamiento" && tab !== "lluvias" && tab !== "finanzas" && <Placeholder label={NAV_ITEMS.find(n => n.id === tab)?.label} T={T} />}
+            {tab === "finanzas" && <Finanzas T={T} />}
             {tab === "lluvias" && <Lluvias T={T} />}
             {tab === "arrendamiento" && <Arrendamiento T={T} parcelas={parcelas} />}
           </main>
