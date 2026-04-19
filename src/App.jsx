@@ -785,6 +785,522 @@ function ParcelaPanel({ parcelaId, parcelaData, parcelas, T, onClose }) {
   );
 }
 
+// ─── FEEDLOT & FAENA ─────────────────────────────────────────────────────────
+function Feedlot({ T, parcelas, setParcelas }) {
+  const hoy = new Date().toISOString().split("T")[0];
+  const [tropas, setTropas]       = useState([]);
+  const [alimentos, setAlimentos] = useState([]);
+  const [muertes, setMuertes]     = useState([]);
+  const [salidas, setSalidas]     = useState([]);
+  const [modal, setModal]         = useState(null); // "tropa"|"salida"|"alimento"|"muerte"|"hoteleria"
+  const [loading, setLoading]     = useState(false);
+
+  const [formTropa, setFormTropa] = useState({
+    fecha: hoy, machos: "", hembras: "", pesoPromedio: "", observaciones: "",
+    parcelaOrigen: "",
+  });
+  const [formSalida, setFormSalida] = useState({
+    fecha: hoy, cantidad: "", pesoPromedio: "", precioKg: "", observaciones: "",
+  });
+  const [formAlimento, setFormAlimento] = useState({
+    fecha: hoy, kg: "", precioKg: "", observaciones: "",
+  });
+  const [formMuerte, setFormMuerte] = useState({
+    fecha: hoy, sexo: "macho", tropaId: "", observaciones: "",
+  });
+  const [formHoteleria, setFormHoteleria] = useState({
+    fecha: hoy, descripcion: "", monto: "",
+  });
+
+  useEffect(() => {
+    const u1 = onSnapshot(collection(db, "feedlot_tropas"), snap => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      data.sort((a, b) => a.numero - b.numero);
+      setTropas(data);
+    });
+    const u2 = onSnapshot(collection(db, "feedlot_alimento"), snap => {
+      setAlimentos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    const u3 = onSnapshot(collection(db, "feedlot_muertes"), snap => {
+      setMuertes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    const u4 = onSnapshot(collection(db, "feedlot_salidas"), snap => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      data.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+      setSalidas(data);
+    });
+    return () => { u1(); u2(); u3(); u4(); };
+  }, []);
+
+  const calcDiasFeedlot = (fechaIngreso) => {
+    if (!fechaIngreso) return 0;
+    return Math.floor((new Date() - new Date(fechaIngreso)) / (1000 * 60 * 60 * 24));
+  };
+
+  // Stats generales
+  const animalesActivos  = tropas.reduce((s, t) => s + (t.stockActual || 0), 0);
+  const kgAlimentoTotal  = alimentos.reduce((s, a) => s + (a.kg || 0), 0);
+  const kgGanadosTotal   = salidas.reduce((s, s2) => s + (s2.kgGanados || 0), 0);
+  const conversionIndice = kgGanadosTotal > 0 ? (kgAlimentoTotal / kgGanadosTotal).toFixed(2) : "—";
+  const muertesTotal     = muertes.length;
+
+  // FIFO: dada una cantidad a sacar, distribuye entre tropas por orden de ingreso
+  const calcFIFO = (cantidadASacar) => {
+    const tropasActivas = tropas.filter(t => (t.stockActual || 0) > 0).sort((a, b) => a.numero - b.numero);
+    const distribucion = [];
+    let restante = cantidadASacar;
+    for (const t of tropasActivas) {
+      if (restante <= 0) break;
+      const sacar = Math.min(restante, t.stockActual);
+      distribucion.push({ tropa: t, cantidad: sacar });
+      restante -= sacar;
+    }
+    return distribucion;
+  };
+
+  const handleCargarTropa = async () => {
+    const machos  = parseInt(formTropa.machos)  || 0;
+    const hembras = parseInt(formTropa.hembras) || 0;
+    const total   = machos + hembras;
+    if (!total || !formTropa.pesoPromedio) return;
+    setLoading(true);
+    try {
+      const numero = tropas.length + 1;
+      await addDoc(collection(db, "feedlot_tropas"), {
+        numero,
+        nombre: numero + "ra tropa",
+        fecha:  formTropa.fecha,
+        machos, hembras,
+        total,
+        stockActual: total,
+        pesoPromedio: parseFloat(formTropa.pesoPromedio),
+        parcelaOrigen: formTropa.parcelaOrigen,
+        observaciones: formTropa.observaciones,
+        creadoEn: hoy,
+      });
+      // Descontar del campo si hay parcela origen
+      if (formTropa.parcelaOrigen && parcelas[formTropa.parcelaOrigen]) {
+        const p = parcelas[formTropa.parcelaOrigen];
+        const restantes = (p.animales || 0) - total;
+        await setDoc(doc(db, "parcelas", formTropa.parcelaOrigen), {
+          ...p,
+          animales: Math.max(0, restantes),
+          estado: restantes <= 0 ? "descanso" : "pastoreo",
+          fechaDescanso: restantes <= 0 ? hoy : null,
+          fechaIngreso: restantes <= 0 ? null : p.fechaIngreso,
+        });
+      }
+      setModal(null);
+      setFormTropa({ fecha: hoy, machos: "", hembras: "", pesoPromedio: "", observaciones: "", parcelaOrigen: "" });
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  const handleSalida = async () => {
+    const cant = parseInt(formSalida.cantidad);
+    if (!cant || !formSalida.pesoPromedio || !formSalida.precioKg) return;
+    setLoading(true);
+    try {
+      const distribucion = calcFIFO(cant);
+      const pesoSalida   = parseFloat(formSalida.pesoPromedio);
+      const precioKg     = parseFloat(formSalida.precioKg);
+
+      for (const { tropa, cantidad } of distribucion) {
+        const kgGanados = (pesoSalida - tropa.pesoPromedio) * cantidad;
+        const diasFeedlot = calcDiasFeedlot(tropa.fecha);
+        const totalVenta  = cantidad * pesoSalida * precioKg;
+
+        await addDoc(collection(db, "feedlot_salidas"), {
+          fecha:        formSalida.fecha,
+          tropaId:      tropa.id,
+          tropaNombre:  tropa.nombre,
+          tropaNumero:  tropa.numero,
+          cantidad,
+          pesoIngreso:  tropa.pesoPromedio,
+          pesoSalida,
+          kgGanados:    Math.max(0, kgGanados),
+          diasFeedlot,
+          precioKg,
+          totalVenta,
+          observaciones: formSalida.observaciones,
+          creadoEn: hoy,
+        });
+
+        // Actualizar stock de la tropa
+        await updateDoc(doc(db, "feedlot_tropas", tropa.id), {
+          stockActual: tropa.stockActual - cantidad,
+        });
+
+        // Registrar venta en Finanzas
+        await addDoc(collection(db, "ventas"), {
+          fecha:        formSalida.fecha,
+          tropa:        tropa.nombre + " (feedlot)",
+          cabezas:      cantidad,
+          pesoPromedio: pesoSalida,
+          precioKg,
+          kgTotal:      cantidad * pesoSalida,
+          total:        totalVenta,
+          moneda:       "ARS",
+          anio:         new Date(formSalida.fecha).getFullYear(),
+          mes:          new Date(formSalida.fecha).getMonth(),
+          creadoEn:     hoy,
+        });
+      }
+      setModal(null);
+      setFormSalida({ fecha: hoy, cantidad: "", pesoPromedio: "", precioKg: "", observaciones: "" });
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  const handleAlimento = async () => {
+    if (!formAlimento.kg || !formAlimento.precioKg) return;
+    setLoading(true);
+    try {
+      const kg    = parseFloat(formAlimento.kg);
+      const pKg   = parseFloat(formAlimento.precioKg);
+      const total = kg * pKg;
+      await addDoc(collection(db, "feedlot_alimento"), {
+        fecha: formAlimento.fecha, kg, precioKg: pKg, total,
+        observaciones: formAlimento.observaciones, creadoEn: hoy,
+      });
+      // Registrar en Finanzas
+      await addDoc(collection(db, "gastos"), {
+        fecha: formAlimento.fecha, tipo: "feedlot_alimento",
+        descripcion: "Alimento feedlot — " + kg + " kg",
+        monto: total, moneda: "ARS",
+        anio: new Date(formAlimento.fecha).getFullYear(),
+        mes:  new Date(formAlimento.fecha).getMonth(),
+        creadoEn: hoy,
+      });
+      setModal(null);
+      setFormAlimento({ fecha: hoy, kg: "", precioKg: "", observaciones: "" });
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  const handleMuerte = async () => {
+    if (!formMuerte.tropaId) return;
+    setLoading(true);
+    try {
+      const tropa = tropas.find(t => t.id === formMuerte.tropaId);
+      await addDoc(collection(db, "feedlot_muertes"), {
+        fecha: formMuerte.fecha, sexo: formMuerte.sexo,
+        tropaId: formMuerte.tropaId,
+        tropaNombre: tropa?.nombre || "",
+        observaciones: formMuerte.observaciones, creadoEn: hoy,
+      });
+      if (tropa) {
+        await updateDoc(doc(db, "feedlot_tropas", tropa.id), {
+          stockActual: Math.max(0, (tropa.stockActual || 0) - 1),
+          [formMuerte.sexo === "macho" ? "machos" : "hembras"]: Math.max(0, (tropa[formMuerte.sexo === "macho" ? "machos" : "hembras"] || 0) - 1),
+        });
+      }
+      setModal(null);
+      setFormMuerte({ fecha: hoy, sexo: "macho", tropaId: "", observaciones: "" });
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  const handleHoteleria = async () => {
+    if (!formHoteleria.monto) return;
+    setLoading(true);
+    try {
+      await addDoc(collection(db, "gastos"), {
+        fecha: formHoteleria.fecha, tipo: "feedlot_hoteleria",
+        descripcion: formHoteleria.descripcion || "Hotelería feedlot",
+        monto: parseFloat(formHoteleria.monto), moneda: "ARS",
+        anio: new Date(formHoteleria.fecha).getFullYear(),
+        mes:  new Date(formHoteleria.fecha).getMonth(),
+        creadoEn: hoy,
+      });
+      setModal(null);
+      setFormHoteleria({ fecha: hoy, descripcion: "", monto: "" });
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  const fmt = (n) => n ? new Intl.NumberFormat("es-AR").format(Math.round(n)) : "0";
+  const CARD = { background: T.bgCard, border: "1px solid " + T.border, borderRadius: 10, padding: "18px 22px" };
+  const inp = {
+    width: "100%", padding: "10px 12px", borderRadius: 6, fontSize: 14,
+    background: T.bgInput, border: "1px solid " + T.border,
+    color: T.text, boxSizing: "border-box", outline: "none", fontFamily: "'Outfit', sans-serif",
+  };
+
+  // Preview FIFO para el formulario de salida
+  const previewFIFO = formSalida.cantidad ? calcFIFO(parseInt(formSalida.cantidad)) : [];
+
+  return (
+    <div>
+      {/* Header + botones */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 26, color: T.cream, fontWeight: 700 }}>Feedlot & Faena</div>
+          <div style={{ fontSize: 14, color: T.textMuted, marginTop: 2 }}>Engorde a corral — sistema FIFO</div>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {[
+            { id: "tropa",     label: "+ Cargar tropa",      color: T.green },
+            { id: "salida",    label: "+ Registrar salida",  color: T.teal },
+            { id: "alimento",  label: "+ Compra alimento",   color: T.brownLight },
+            { id: "muerte",    label: "+ Registrar muerte",  color: T.red },
+            { id: "hoteleria", label: "+ Hotelería",         color: T.textMuted },
+          ].map(b => (
+            <button key={b.id} onClick={() => setModal(modal === b.id ? null : b.id)}
+              style={{ padding: "9px 16px", borderRadius: 7, border: modal === b.id ? "none" : "1px solid " + T.border,
+                background: modal === b.id ? b.color : "transparent",
+                color: modal === b.id ? "#fff" : T.textMuted,
+                cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'Outfit', sans-serif", transition: "all 0.15s" }}>
+              {b.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "En feedlot",       value: animalesActivos,    unit: "cab.",    color: T.tealLight },
+          { label: "Tropas activas",   value: tropas.filter(t => (t.stockActual||0) > 0).length, unit: "tropas", color: T.text },
+          { label: "Alimento total",   value: fmt(kgAlimentoTotal), unit: "kg",   color: T.brownLight },
+          { label: "Kg carne ganados", value: fmt(kgGanadosTotal),  unit: "kg",   color: T.greenLight },
+          { label: "Conversión",       value: conversionIndice,    unit: "kg ali/kg carne", color: conversionIndice !== "—" && parseFloat(conversionIndice) < 7 ? T.greenLight : T.brownLight },
+        ].map(s => (
+          <div key={s.label} style={{ ...CARD }}>
+            <div style={{ fontSize: 12, color: T.textMuted, marginBottom: 6 }}>{s.label}</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: s.color, lineHeight: 1, fontFamily: "'Outfit', sans-serif" }}>{s.value}</div>
+            <div style={{ fontSize: 11, color: T.textMuted, marginTop: 3 }}>{s.unit}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Formularios */}
+      {modal === "tropa" && (
+        <div style={{ ...CARD, border: "1px solid " + T.green, marginBottom: 20 }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 19, color: T.greenLight, marginBottom: 16, fontWeight: 700 }}>
+            Cargar tropa — #{tropas.length + 1}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Fecha ingreso</div><input type="date" value={formTropa.fecha} onChange={e => setFormTropa(f=>({...f,fecha:e.target.value}))} style={inp}/></div>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Machos</div><input type="number" placeholder="0" value={formTropa.machos} onChange={e => setFormTropa(f=>({...f,machos:e.target.value}))} style={inp}/></div>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Hembras</div><input type="number" placeholder="0" value={formTropa.hembras} onChange={e => setFormTropa(f=>({...f,hembras:e.target.value}))} style={inp}/></div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Peso promedio ingreso (kg)</div><input type="number" placeholder="Ej: 320" value={formTropa.pesoPromedio} onChange={e => setFormTropa(f=>({...f,pesoPromedio:e.target.value}))} style={inp}/></div>
+            <div>
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Parcela origen (opcional)</div>
+              <select value={formTropa.parcelaOrigen} onChange={e => setFormTropa(f=>({...f,parcelaOrigen:e.target.value}))} style={inp}>
+                <option value="">— Sin descontar del campo —</option>
+                {Object.keys({ ...PARCELAS_DEFAULT, ...parcelas }).sort().map(k => {
+                  const d = parcelas[k];
+                  return <option key={k} value={k}>{k} {d?.animales > 0 ? "(" + d.animales + " cab.)" : "(vacía)"}</option>;
+                })}
+              </select>
+            </div>
+          </div>
+          <div style={{ marginBottom: 12 }}><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Observaciones</div><input value={formTropa.observaciones} onChange={e => setFormTropa(f=>({...f,observaciones:e.target.value}))} style={inp}/></div>
+          {(formTropa.machos || formTropa.hembras) && (
+            <div style={{ padding: "8px 14px", background: T.bgHover, borderRadius: 8, marginBottom: 12, fontSize: 13, color: T.textMuted }}>
+              Total: <b style={{ color: T.greenLight }}>{(parseInt(formTropa.machos)||0) + (parseInt(formTropa.hembras)||0)} cabezas</b>
+            </div>
+          )}
+          <button onClick={handleCargarTropa} disabled={loading}
+            style={{ padding: "10px 28px", borderRadius: 7, border: "none", background: T.green, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
+            {loading ? "Guardando..." : "Cargar tropa"}
+          </button>
+        </div>
+      )}
+
+      {modal === "salida" && (
+        <div style={{ ...CARD, border: "1px solid " + T.teal, marginBottom: 20 }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 19, color: T.tealLight, marginBottom: 16, fontWeight: 700 }}>
+            Registrar salida — FIFO automático
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Fecha salida</div><input type="date" value={formSalida.fecha} onChange={e => setFormSalida(f=>({...f,fecha:e.target.value}))} style={inp}/></div>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Cantidad cabezas</div><input type="number" value={formSalida.cantidad} onChange={e => setFormSalida(f=>({...f,cantidad:e.target.value}))} style={inp}/></div>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Peso promedio salida (kg)</div><input type="number" value={formSalida.pesoPromedio} onChange={e => setFormSalida(f=>({...f,pesoPromedio:e.target.value}))} style={inp}/></div>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Precio por kg ($)</div><input type="number" value={formSalida.precioKg} onChange={e => setFormSalida(f=>({...f,precioKg:e.target.value}))} style={inp}/></div>
+          </div>
+          <div style={{ marginBottom: 12 }}><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Observaciones</div><input value={formSalida.observaciones} onChange={e => setFormSalida(f=>({...f,observaciones:e.target.value}))} style={inp}/></div>
+
+          {/* Preview FIFO */}
+          {previewFIFO.length > 0 && (
+            <div style={{ padding: "12px 16px", background: T.bgHover, borderRadius: 8, marginBottom: 12, border: "1px solid " + T.teal }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: T.tealLight, marginBottom: 8, letterSpacing: "0.05em" }}>DISTRIBUCIÓN FIFO</div>
+              {previewFIFO.map(({ tropa, cantidad }) => (
+                <div key={tropa.id} style={{ fontSize: 13, color: T.text, marginBottom: 4 }}>
+                  <span style={{ color: T.tealLight, fontWeight: 700 }}>{tropa.nombre}</span>
+                  {" — "}{cantidad} cab.
+                  {formSalida.pesoPromedio && (
+                    <span style={{ color: T.greenLight, marginLeft: 8 }}>
+                      +{((parseFloat(formSalida.pesoPromedio) - tropa.pesoPromedio) * cantidad).toFixed(0)} kg ganados
+                    </span>
+                  )}
+                  {formSalida.pesoPromedio && formSalida.precioKg && (
+                    <span style={{ color: T.brownLight, marginLeft: 8 }}>
+                      $ {fmt(cantidad * parseFloat(formSalida.pesoPromedio) * parseFloat(formSalida.precioKg))}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <button onClick={handleSalida} disabled={loading || !formSalida.cantidad || !formSalida.pesoPromedio || !formSalida.precioKg}
+            style={{ padding: "10px 28px", borderRadius: 7, border: "none", background: T.teal, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
+            {loading ? "Guardando..." : "Confirmar salida"}
+          </button>
+        </div>
+      )}
+
+      {modal === "alimento" && (
+        <div style={{ ...CARD, border: "1px solid " + T.brownLight, marginBottom: 20 }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 19, color: T.brownLight, marginBottom: 16, fontWeight: 700 }}>Compra de alimento</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Fecha</div><input type="date" value={formAlimento.fecha} onChange={e => setFormAlimento(f=>({...f,fecha:e.target.value}))} style={inp}/></div>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Cantidad (kg)</div><input type="number" value={formAlimento.kg} onChange={e => setFormAlimento(f=>({...f,kg:e.target.value}))} style={inp}/></div>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Precio por kg ($)</div><input type="number" value={formAlimento.precioKg} onChange={e => setFormAlimento(f=>({...f,precioKg:e.target.value}))} style={inp}/></div>
+          </div>
+          {formAlimento.kg && formAlimento.precioKg && (
+            <div style={{ padding: "8px 14px", background: T.bgHover, borderRadius: 8, marginBottom: 12, fontSize: 13, color: T.textMuted }}>
+              Total: <b style={{ color: T.brownLight }}>$ {fmt(parseFloat(formAlimento.kg) * parseFloat(formAlimento.precioKg))}</b>
+              {" — se registra en Finanzas automáticamente"}
+            </div>
+          )}
+          <button onClick={handleAlimento} disabled={loading}
+            style={{ padding: "10px 28px", borderRadius: 7, border: "none", background: T.brownLight, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
+            {loading ? "Guardando..." : "Guardar compra"}
+          </button>
+        </div>
+      )}
+
+      {modal === "muerte" && (
+        <div style={{ ...CARD, border: "1px solid " + T.red, marginBottom: 20 }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 19, color: T.red, marginBottom: 16, fontWeight: 700 }}>Registrar muerte</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Fecha</div><input type="date" value={formMuerte.fecha} onChange={e => setFormMuerte(f=>({...f,fecha:e.target.value}))} style={inp}/></div>
+            <div>
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Sexo</div>
+              <select value={formMuerte.sexo} onChange={e => setFormMuerte(f=>({...f,sexo:e.target.value}))} style={inp}>
+                <option value="macho">Macho</option>
+                <option value="hembra">Hembra</option>
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Tropa</div>
+              <select value={formMuerte.tropaId} onChange={e => setFormMuerte(f=>({...f,tropaId:e.target.value}))} style={inp}>
+                <option value="">— Seleccionar —</option>
+                {tropas.filter(t => (t.stockActual||0) > 0).map(t => (
+                  <option key={t.id} value={t.id}>{t.nombre} ({t.stockActual} cab.)</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div style={{ marginBottom: 12 }}><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Observaciones</div><input value={formMuerte.observaciones} onChange={e => setFormMuerte(f=>({...f,observaciones:e.target.value}))} style={inp}/></div>
+          <button onClick={handleMuerte} disabled={loading || !formMuerte.tropaId}
+            style={{ padding: "10px 28px", borderRadius: 7, border: "none", background: T.red, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
+            {loading ? "Guardando..." : "Registrar"}
+          </button>
+        </div>
+      )}
+
+      {modal === "hoteleria" && (
+        <div style={{ ...CARD, border: "1px solid " + T.textMuted, marginBottom: 20 }}>
+          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 19, color: T.text, marginBottom: 16, fontWeight: 700 }}>Costo hotelería</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Fecha</div><input type="date" value={formHoteleria.fecha} onChange={e => setFormHoteleria(f=>({...f,fecha:e.target.value}))} style={inp}/></div>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Descripción</div><input placeholder="Ej: Hotelería abril" value={formHoteleria.descripcion} onChange={e => setFormHoteleria(f=>({...f,descripcion:e.target.value}))} style={inp}/></div>
+            <div><div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Monto ($)</div><input type="number" value={formHoteleria.monto} onChange={e => setFormHoteleria(f=>({...f,monto:e.target.value}))} style={inp}/></div>
+          </div>
+          <button onClick={handleHoteleria} disabled={loading}
+            style={{ padding: "10px 28px", borderRadius: 7, border: "none", background: T.brown, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
+            {loading ? "Guardando..." : "Guardar"}
+          </button>
+        </div>
+      )}
+
+      {/* Tropas activas */}
+      <div style={{ ...CARD, marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: T.textMuted, letterSpacing: "0.06em", marginBottom: 14 }}>TROPAS EN FEEDLOT</div>
+        {tropas.length === 0 ? (
+          <div style={{ fontSize: 13, color: T.textDim, fontStyle: "italic" }}>Sin tropas cargadas aún</div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
+            {tropas.map(t => {
+              const dias = calcDiasFeedlot(t.fecha);
+              const activo = (t.stockActual || 0) > 0;
+              const salidosCount = salidas.filter(s => s.tropaId === t.id).reduce((sum, s) => sum + s.cantidad, 0);
+              const muertesCount = muertes.filter(m => m.tropaId === t.id).length;
+              return (
+                <div key={t.id} style={{ background: T.bgHover, border: "1px solid " + (activo ? T.teal : T.border), borderRadius: 10, padding: "14px 16px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: T.cream, fontWeight: 700 }}>{t.nombre}</div>
+                    <div style={{ padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
+                      background: activo ? T.teal + "22" : T.bgCard,
+                      color: activo ? T.tealLight : T.textDim,
+                      border: "1px solid " + (activo ? T.teal : T.border) }}>
+                      {activo ? "activa" : "finalizada"}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.9 }}>
+                    <div>Ingreso: <b style={{ color: T.text }}>{t.fecha}</b> · <b style={{ color: T.tealLight }}>{dias}d</b></div>
+                    <div>Stock actual: <b style={{ color: activo ? T.greenLight : T.textDim }}>{t.stockActual || 0} cab.</b></div>
+                    <div>Machos: <b style={{ color: T.text }}>{t.machos}</b> · Hembras: <b style={{ color: T.text }}>{t.hembras}</b></div>
+                    <div>Peso ingreso: <b style={{ color: T.text }}>{t.pesoPromedio} kg/cab</b></div>
+                    {salidosCount > 0 && <div>Salidos: <b style={{ color: T.tealLight }}>{salidosCount} cab.</b></div>}
+                    {muertesCount > 0 && <div>Muertes: <b style={{ color: T.red }}>{muertesCount}</b></div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Historial salidas */}
+      {salidas.length > 0 && (
+        <div style={{ ...CARD, marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: T.textMuted, letterSpacing: "0.06em", marginBottom: 14 }}>HISTORIAL DE SALIDAS</div>
+          {salidas.slice().reverse().map(s => (
+            <div key={s.id} style={{ padding: "10px 14px", background: T.bgHover, borderRadius: 8, marginBottom: 6, borderLeft: "3px solid " + T.teal }}>
+              <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                <div>
+                  <span style={{ color: T.brownLight, fontWeight: 700, fontSize: 13, marginRight: 10 }}>{s.fecha}</span>
+                  <span style={{ color: T.tealLight, fontWeight: 700 }}>{s.tropaNombre}</span>
+                  <span style={{ color: T.textMuted, fontSize: 13 }}> — {s.cantidad} cab.</span>
+                </div>
+                <div style={{ display: "flex", gap: 16, fontSize: 13 }}>
+                  <span style={{ color: T.textMuted }}>{s.pesoIngreso}→{s.pesoSalida} kg</span>
+                  <span style={{ color: T.greenLight, fontWeight: 700 }}>+{fmt(s.kgGanados)} kg</span>
+                  <span style={{ color: T.brownLight, fontWeight: 700 }}>$ {fmt(s.totalVenta)}</span>
+                  <span style={{ color: T.textDim }}>{s.diasFeedlot}d</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Muertes */}
+      {muertes.length > 0 && (
+        <div style={{ ...CARD }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: T.textMuted, letterSpacing: "0.06em", marginBottom: 14 }}>
+            BAJAS — Total: <span style={{ color: T.red }}>{muertesTotal}</span>
+          </div>
+          {muertes.slice().reverse().map(m => (
+            <div key={m.id} style={{ padding: "8px 12px", background: T.bgHover, borderRadius: 6, marginBottom: 4, fontSize: 13, display: "flex", gap: 12 }}>
+              <span style={{ color: T.red, fontWeight: 700 }}>{m.fecha}</span>
+              <span style={{ color: T.textMuted }}>{m.tropaNombre}</span>
+              <span style={{ color: T.text }}>{m.sexo}</span>
+              {m.observaciones && <span style={{ color: T.textDim, fontStyle: "italic" }}>{m.observaciones}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── MANTENIMIENTO ───────────────────────────────────────────────────────────
 function Mantenimiento({ T, infra }) {
   const [gastos, setGastos]         = useState([]);
@@ -2511,7 +3027,8 @@ export default function App() {
   const [tab, setTab]             = useState("campo");
   const [sidebarOpen, setSidebar] = useState(true);
   const [parcelas, setParcelas]   = useState(PARCELAS_DEFAULT);
-  const [infra, setInfra]         = useState([]);
+  const [infra, setInfra]           = useState([]);
+  const [feedlotTropas, setFeedlotTropas] = useState([]);
   const [loadingDB, setLoadingDB] = useState(true);
   const T = THEMES[themeKey];
 
@@ -2534,8 +3051,16 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  const totalAnimales   = Object.values(parcelas).reduce((s, p) => s + (p.animales || 0), 0);
-  const totalArrendados = Object.values(parcelas).filter(p => p.tipo === "arrendamiento").reduce((s, p) => s + (p.animales || 0), 0);
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "feedlot_tropas"), snap => {
+      setFeedlotTropas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, []);
+
+  const totalAnimales    = Object.values(parcelas).reduce((s, p) => s + (p.animales || 0), 0);
+  const totalArrendados  = Object.values(parcelas).filter(p => p.tipo === "arrendamiento").reduce((s, p) => s + (p.animales || 0), 0);
+  const totalFeedlot     = feedlotTropas.reduce((s, t) => s + (t.stockActual || 0), 0);
 
   return (
     <>
@@ -2598,11 +3123,16 @@ export default function App() {
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               {loadingDB && <div style={{ fontSize: 12, color: T.textMuted }}>Conectando...</div>}
               <div style={{ padding: "7px 18px", borderRadius: 20, background: T.teal + "18", border: "1px solid " + T.teal, fontSize: 14, color: T.tealLight, fontWeight: 600 }}>
-                {totalAnimales} cab. totales
+                {totalAnimales} pastoreando
               </div>
               <div style={{ padding: "7px 18px", borderRadius: 20, background: T.brown + "18", border: "1px solid " + T.brown, fontSize: 14, color: T.brownLight, fontWeight: 600 }}>
                 {totalArrendados} arrendadas
               </div>
+              {totalFeedlot > 0 && (
+                <div style={{ padding: "7px 18px", borderRadius: 20, background: T.green + "18", border: "1px solid " + T.green, fontSize: 14, color: T.greenLight, fontWeight: 600 }}>
+                  {totalFeedlot} en feedlot
+                </div>
+              )}
             </div>
           </header>
 
@@ -2610,7 +3140,8 @@ export default function App() {
             {tab === "campo"   && <MapaCampo parcelas={parcelas} infra={infra} T={T} />}
             {tab === "stock"   && <Stock T={T} />}
             {tab === "compras" && <Compras T={T} parcelas={parcelas} />}
-            {tab !== "campo" && tab !== "stock" && tab !== "compras" && tab !== "arrendamiento" && tab !== "lluvias" && tab !== "finanzas" && tab !== "mantenimiento" && <Placeholder label={NAV_ITEMS.find(n => n.id === tab)?.label} T={T} />}
+            {tab !== "campo" && tab !== "stock" && tab !== "compras" && tab !== "arrendamiento" && tab !== "lluvias" && tab !== "finanzas" && tab !== "mantenimiento" && tab !== "feedlot" && <Placeholder label={NAV_ITEMS.find(n => n.id === tab)?.label} T={T} />}
+            {tab === "feedlot" && <Feedlot T={T} parcelas={parcelas} setParcelas={setParcelas} />}
             {tab === "finanzas"     && <Finanzas T={T} />}
             {tab === "mantenimiento" && <Mantenimiento T={T} infra={infra} />}
             {tab === "lluvias" && <Lluvias T={T} />}
