@@ -1156,7 +1156,6 @@ function Feedlot({ T, parcelas, setParcelas }) {
           <button onClick={() => setModal(null)} style={{ padding: "10px 16px", borderRadius: 7, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 14, fontFamily: "'Outfit', sans-serif" }}>Cancelar</button>
           </div>
       )}
-      )}
 
       {modal === "alimento" && (
         <div style={{ ...CARD, border: "1px solid " + T.brownLight, marginBottom: 20 }}>
