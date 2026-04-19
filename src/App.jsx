@@ -1046,7 +1046,7 @@ function Feedlot({ T, parcelas, setParcelas }) {
             { id: "muerte",    label: "+ Registrar muerte",  color: T.red },
             { id: "hoteleria", label: "+ Hotelería",         color: T.textMuted },
           ].map(b => (
-            <button key={b.id} onClick={() => setModal(modal === b.id ? null : b.id)}
+            <button key={b.id} onClick={() => setModal(b.id)}
               style={{ padding: "9px 16px", borderRadius: 7, border: modal === b.id ? "none" : "1px solid " + T.border,
                 background: modal === b.id ? b.color : "transparent",
                 color: modal === b.id ? "#fff" : T.textMuted,
@@ -1104,10 +1104,13 @@ function Feedlot({ T, parcelas, setParcelas }) {
               Total: <b style={{ color: T.greenLight }}>{(parseInt(formTropa.machos)||0) + (parseInt(formTropa.hembras)||0)} cabezas</b>
             </div>
           )}
+          <div style={{ display: "flex", gap: 8 }}>
           <button onClick={handleCargarTropa} disabled={loading}
             style={{ padding: "10px 28px", borderRadius: 7, border: "none", background: T.green, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
             {loading ? "Guardando..." : "Cargar tropa"}
           </button>
+          <button onClick={() => setModal(null)} style={{ padding: "10px 16px", borderRadius: 7, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 14, fontFamily: "'Outfit', sans-serif" }}>Cancelar</button>
+          </div>
         </div>
       )}
 
@@ -1150,7 +1153,9 @@ function Feedlot({ T, parcelas, setParcelas }) {
             style={{ padding: "10px 28px", borderRadius: 7, border: "none", background: T.teal, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
             {loading ? "Guardando..." : "Confirmar salida"}
           </button>
-        </div>
+          <button onClick={() => setModal(null)} style={{ padding: "10px 16px", borderRadius: 7, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 14, fontFamily: "'Outfit', sans-serif" }}>Cancelar</button>
+          </div>
+      )}
       )}
 
       {modal === "alimento" && (
@@ -1171,7 +1176,8 @@ function Feedlot({ T, parcelas, setParcelas }) {
             style={{ padding: "10px 28px", borderRadius: 7, border: "none", background: T.brownLight, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
             {loading ? "Guardando..." : "Guardar compra"}
           </button>
-        </div>
+          <button onClick={() => setModal(null)} style={{ padding: "10px 16px", borderRadius: 7, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 14, fontFamily: "'Outfit', sans-serif" }}>Cancelar</button>
+          </div>
       )}
 
       {modal === "muerte" && (
@@ -1201,7 +1207,8 @@ function Feedlot({ T, parcelas, setParcelas }) {
             style={{ padding: "10px 28px", borderRadius: 7, border: "none", background: T.red, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
             {loading ? "Guardando..." : "Registrar"}
           </button>
-        </div>
+          <button onClick={() => setModal(null)} style={{ padding: "10px 16px", borderRadius: 7, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 14, fontFamily: "'Outfit', sans-serif" }}>Cancelar</button>
+          </div>
       )}
 
       {modal === "hoteleria" && (
@@ -1216,7 +1223,8 @@ function Feedlot({ T, parcelas, setParcelas }) {
             style={{ padding: "10px 28px", borderRadius: 7, border: "none", background: T.brown, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif" }}>
             {loading ? "Guardando..." : "Guardar"}
           </button>
-        </div>
+          <button onClick={() => setModal(null)} style={{ padding: "10px 16px", borderRadius: 7, border: "1px solid " + T.border, background: "transparent", color: T.textMuted, cursor: "pointer", fontSize: 14, fontFamily: "'Outfit', sans-serif" }}>Cancelar</button>
+          </div>
       )}
 
       {/* Tropas activas */}
